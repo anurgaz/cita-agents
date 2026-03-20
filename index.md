@@ -181,3 +181,4 @@ cita-agents/
 - **Mini App:** Next.js 16, Zustand, Telegram WebApp SDK
 - **Интеграции:** Telegram Bot API (webhook), 2GIS Suggest API, reCAPTCHA v3
 - **Репозиторий:** [github.com/anurgaz/cita](https://github.com/anurgaz/cita)
+
