@@ -83,26 +83,32 @@
 
 ## Взаимодействие между агентами
 
-```
-PO/Stakeholder
-    |
-    v
-  BA Agent --- user story + acceptance criteria
-    |
-    v
-  SA Agent --- API spec + sequence diagram + test cases
-    |
-    v
-  [Разработка + Деплой]  <-- человек
-    |
-    v
-  TW Agent --- API reference + how-to guides + changelog
-    |
-    v
-  CS Agent --- ответы клиентам на основе документации TW
-    |
-    ^
-  Bug report --> Tech Lead --> BA/SA (если нужна новая фича/фикс)
+```plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
+
+rectangle "PO / Stakeholder" as PO #E6FFFA
+rectangle "BA Agent" as BA #B2F5EA
+rectangle "SA Agent" as SA #81E6D9
+rectangle "Разработка + Деплой\n(человек)" as DEV #FED7D7
+rectangle "TW Agent" as TW #81E6D9
+rectangle "CS Agent" as CS #B2F5EA
+rectangle "Tech Lead" as TL #FED7D7
+
+PO -down-> BA : задача
+BA -down-> SA : user story +\nacceptance criteria
+SA -down-> DEV : API spec + sequence\ndiagram + test cases
+DEV -down-> TW : деплой выполнен
+TW -down-> CS : API reference +\nhow-to guides + changelog
+
+CS -right-> TL : bug report
+TL -up-> BA : новая фича / фикс
+TL -up-> SA : новая фича / фикс
+@enduml
 ```
 
 ## Правила эскалации

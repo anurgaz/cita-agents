@@ -42,4 +42,11 @@ markdown_extensions:
   - tables
   - admonition
   - pymdownx.details
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: plantuml
+          class: plantuml
+          format: !!python/name:plantuml_markdown.fenced_code_format
+  - plantuml_markdown:
+      server: http://www.plantuml.com/plantuml
+      format: svg
