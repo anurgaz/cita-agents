@@ -27,7 +27,7 @@
 
 ## Диаграмма
 
-```plantuml
+```kroki-plantuml
 @startuml
 title {Название сценария}
 
@@ -70,7 +70,7 @@ deactivate C1
 
 ## Мини-пример
 
-```plantuml
+```kroki-plantuml
 @startuml
 title Клиент создает запись через Mini App
 

@@ -83,7 +83,7 @@
 
 ## Взаимодействие между агентами
 
-```plantuml
+```kroki-plantuml
 @startuml
 skinparam backgroundColor transparent
 skinparam shadowing false

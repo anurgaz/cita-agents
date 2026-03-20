@@ -37,16 +37,12 @@ nav:
 
 plugins:
   - search
+  - kroki:
+      ServerURL: https://kroki.io
+      EnableDiagramsnet: false
 
 markdown_extensions:
   - tables
   - admonition
   - pymdownx.details
-  - pymdownx.superfences:
-      custom_fences:
-        - name: plantuml
-          class: plantuml
-          format: !!python/name:plantuml_markdown.fenced_code_format
-  - plantuml_markdown:
-      server: http://www.plantuml.com/plantuml
-      format: svg
+  - pymdownx.superfences
