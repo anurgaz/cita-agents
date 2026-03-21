@@ -60,25 +60,31 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract task from PR title
+        id: task
+        run: |
+          TITLE=$(gh pr view ${{ steps.info.outputs.pr_number }} --json title --jq '.title' 2>/dev/null || echo "")
+          TASK=$(echo "$TITLE" | sed 's/^CIT-[0-9]*: \[[A-Z]*\] //')
+          echo "text=$TASK" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Re-run agent on VPS
         uses: appleboy/ssh-action@v1
         with:
           host: 159.69.28.60
           username: root
           key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 30m
           script: |
             cd /root/cita-agents
             export ANTHROPIC_API_KEY=$(cat /root/.anthropic_key)
 
             CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
-            ORIGINAL_TASK=$(docker exec paperclip-db-1 psql -U paperclip -d paperclip -t -A -c \
-              "SELECT title FROM issues WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};" 2>/dev/null)
-            TASK=$(echo "$ORIGINAL_TASK" | sed 's/^\[[A-Z]*\] //')
-
             docker exec paperclip-db-1 psql -U paperclip -d paperclip -c \
-              "UPDATE issues SET status = 'in_progress', updated_at = now() WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};"
+              "UPDATE issues SET status = 'in_progress', updated_at = now() WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};" 2>/dev/null || true
 
             ./pipeline/run-agent.sh \
               --agent ${{ steps.info.outputs.agent }} \
-              --task "${TASK}" \
+              --task "${{ steps.task.outputs.text }}" \
               --feedback "${{ steps.info.outputs.feedback }}"
