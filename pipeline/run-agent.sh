@@ -223,12 +223,18 @@ detect_target_dir() {
 # ─── Generate filename from task ────────────────────────────────
 make_filename() {
     local task="$1"
-    echo "$task" | \
-        sed 's/[^a-zA-Zа-яА-ЯёЁ0-9 ]//g' | \
+    local issue_num="${2:-0}"
+    local slug
+    slug=$(echo "$task" | \
+        LC_ALL=C sed 's/[^a-zA-Z0-9 ]//g' | \
         tr '[:upper:]' '[:lower:]' | \
         tr ' ' '-' | \
         sed 's/--*/-/g; s/^-//; s/-$//' | \
-        cut -c1-60
+        cut -c1-50)
+    if [[ -z "$slug" ]]; then
+        slug="artifact"
+    fi
+    echo "CIT-${issue_num}-${slug}"
 }
 
 # ─── Render PlantUML blocks to SVG ──────────────────────────────
@@ -371,11 +377,15 @@ while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
         AGENT_UPPER=$(echo "$AGENT" | tr "[:lower:]" "[:upper:]")
 
         # ─── Get next issue number from Paperclip ────────────
-        ISSUE_NUM=$($DB_CMD -c "SELECT COALESCE(MAX(issue_number),0)+1 FROM issues WHERE company_id='$CITA_COMPANY_ID';" 2>/dev/null || echo "1")
+        if [[ -n "${PAPERCLIP_ISSUE_NUMBER:-}" ]]; then
+            ISSUE_NUM="$PAPERCLIP_ISSUE_NUMBER"
+        else
+            ISSUE_NUM=$($DB_CMD -c "SELECT COALESCE(MAX(issue_number),0)+1 FROM issues WHERE company_id='$CITA_COMPANY_ID';" 2>/dev/null || echo "1")
+        fi
 
         # ─── Detect target directory ─────────────────────────
         TARGET_DIR=$(detect_target_dir "$OUTPUT_FILE")
-        FILENAME=$(make_filename "$TASK").md
+        FILENAME=$(make_filename "$TASK" "$ISSUE_NUM").md
         TARGET_PATH="${TARGET_DIR}/${FILENAME}"
 
         # ─── Create branch and PR ────────────────────────────
@@ -425,6 +435,13 @@ ${VALIDATION_OUTPUT}
             --title "CIT-${ISSUE_NUM}: [${AGENT_UPPER}] ${TASK:0:80}" \
             --body "$PR_BODY" \
             2>/dev/null) || PR_URL="FAILED"
+
+        # Add labels to PR
+        if [[ "$PR_URL" != "FAILED" && "$PR_URL" == http* ]]; then
+            PR_NUM=$(echo "$PR_URL" | grep -oP '[0-9]+$')
+            gh api "repos/anurgaz/cita-agents/issues/${PR_NUM}/labels" \
+                -X POST -f "labels[]=artifact" -f "labels[]=${AGENT}" >/dev/null 2>&1 || true
+        fi
 
         git checkout main >/dev/null 2>&1
 

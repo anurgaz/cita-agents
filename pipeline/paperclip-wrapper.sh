@@ -14,37 +14,32 @@ AGENT_ID="${PAPERCLIP_AGENT_ID:?PAPERCLIP_AGENT_ID not set}"
 echo "=== cita-agents wrapper ==="
 echo "Agent type: $AGENT_TYPE"
 echo "Agent ID: $AGENT_ID"
+echo "API URL: $API_URL"
 
-# Find the issue assigned to this agent (status=in_progress, assignee=this agent)
-ISSUES_JSON=$(curl -sf "${API_URL}/api/companies/${COMPANY_ID}/issues?assigneeAgentId=${AGENT_ID}&status=in_progress" \
-  -H "Authorization: Bearer ${API_KEY}" || echo '[]')
+# Helper: extract first issue ID from JSON array
+extract_id() {
+  node -e "
+    const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+    const items = Array.isArray(d) ? d : (d.items || d.data || []);
+    if (items.length) process.stdout.write(items[0].id);
+  " 2>/dev/null
+}
 
-# Parse first issue
-ISSUE_ID=$(echo "$ISSUES_JSON" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-items = data if isinstance(data, list) else data.get('items', data.get('data', []))
-if items:
-    print(items[0]['id'])
-" 2>/dev/null || echo "")
-
-for fallback_status in todo backlog; do
+# Find assigned issue: in_progress > todo > backlog
+ISSUE_ID=""
+for status in in_progress todo backlog; do
   if [[ -z "$ISSUE_ID" ]]; then
-    echo "Checking ${fallback_status}..."
-    ISSUES_JSON=$(curl -sf "${API_URL}/api/companies/${COMPANY_ID}/issues?assigneeAgentId=${AGENT_ID}&status=${fallback_status}" \
-      -H "Authorization: Bearer ${API_KEY}" || echo '[]')
-    ISSUE_ID=$(echo "$ISSUES_JSON" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-items = data if isinstance(data, list) else data.get('items', data.get('data', []))
-if items:
-    print(items[0]['id'])
-" 2>/dev/null || echo "")
+    RESP=$(curl -sf "${API_URL}/api/companies/${COMPANY_ID}/issues?assigneeAgentId=${AGENT_ID}&status=${status}" \
+      -H "Authorization: Bearer ${API_KEY}" 2>/dev/null || echo '[]')
+    ISSUE_ID=$(echo "$RESP" | extract_id || echo "")
+    if [[ -n "$ISSUE_ID" ]]; then
+      echo "Found issue (${status}): $ISSUE_ID"
+    fi
   fi
 done
 
 if [[ -z "$ISSUE_ID" ]]; then
-  echo "No issues found for agent. Nothing to do."
+  echo "No issues assigned to this agent. Nothing to do."
   exit 0
 fi
 
@@ -52,21 +47,26 @@ fi
 ISSUE_JSON=$(curl -sf "${API_URL}/api/issues/${ISSUE_ID}" \
   -H "Authorization: Bearer ${API_KEY}")
 
-ISSUE_TITLE=$(echo "$ISSUE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['title'])")
-ISSUE_DESC=$(echo "$ISSUE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('description',''))")
-ISSUE_NUMBER=$(echo "$ISSUE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['issueNumber'])")
-ISSUE_IDENTIFIER=$(echo "$ISSUE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin)['identifier'])")
+eval "$(echo "$ISSUE_JSON" | node -e "
+  const d = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
+  console.log('ISSUE_TITLE=' + JSON.stringify(d.title));
+  console.log('ISSUE_NUMBER=' + d.issueNumber);
+  console.log('ISSUE_IDENTIFIER=' + d.identifier);
+")"
 
 echo "Issue: $ISSUE_IDENTIFIER - $ISSUE_TITLE"
 
 # Strip agent prefix from title: "[BA] actual task" -> "actual task"
 TASK=$(echo "$ISSUE_TITLE" | sed 's/^\[[A-Z]*\] //')
 
-# Update status to in_progress
+# Update status to in_progress via API
 curl -sf -X PATCH "${API_URL}/api/issues/${ISSUE_ID}" \
   -H "Authorization: Bearer ${API_KEY}" \
   -H "Content-Type: application/json" \
   -d '{"status":"in_progress"}' > /dev/null 2>&1 || true
+
+# Export issue number for run-agent.sh
+export PAPERCLIP_ISSUE_NUMBER="$ISSUE_NUMBER"
 
 # Load Anthropic API key
 export ANTHROPIC_API_KEY=$(cat /root/.anthropic_key)
@@ -82,7 +82,6 @@ cd /root/cita-agents
 EXIT_CODE=$?
 
 if [[ $EXIT_CODE -eq 0 ]]; then
-  # Update Paperclip status to done (PR created, awaiting review)
   curl -sf -X PATCH "${API_URL}/api/issues/${ISSUE_ID}" \
     -H "Authorization: Bearer ${API_KEY}" \
     -H "Content-Type: application/json" \
