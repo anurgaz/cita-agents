@@ -211,10 +211,56 @@ while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
     VALIDATION_OUTPUT=""
     if VALIDATION_OUTPUT=$("$VALIDATE_SCRIPT" "$OUTPUT_FILE" 2>&1); then
         echo ""
-        echo "═══════════════════════════════════════════"
-        echo "  PASSED - Ready for review"
-        echo "  Output: $OUTPUT_FILE"
-        echo "═══════════════════════════════════════════"
+        echo "  Validation PASSED. Creating Paperclip issue..."
+
+        # Create issue in Paperclip (cita.kz company)
+        CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
+        DB_CMD="docker exec paperclip-db-1 psql -U paperclip -d paperclip -t -A"
+        AGENT_UPPER=$(echo "$AGENT" | tr "[:lower:]" "[:upper:]")
+
+        # Get next issue number
+        ISSUE_NUM=$($DB_CMD -c "SELECT COALESCE(MAX(issue_number),0)+1 FROM issues WHERE company_id='$CITA_COMPANY_ID';" 2>/dev/null || echo "1")
+
+        # Build title
+        ISSUE_TITLE="[$AGENT_UPPER] ${TASK:0:80}"
+
+        # Escape content for SQL
+        ARTIFACT_CONTENT=$(cat "$OUTPUT_FILE" | sed "s/'/''/g")
+        VALIDATION_LOG=$(echo "$VALIDATION_OUTPUT" | sed "s/'/''/g" | head -30)
+
+        ISSUE_DESC="## Задача
+${TASK}
+
+## Артефакт
+${ARTIFACT_CONTENT}
+
+## Отчёт валидации
+${VALIDATION_LOG}
+
+PASSED (all checks)"
+
+        ESCAPED_DESC=$(echo "$ISSUE_DESC" | sed "s/'/''/g")
+
+        # Find agent ID in Paperclip
+        AGENT_ID=$($DB_CMD -c "SELECT id FROM agents WHERE company_id='$CITA_COMPANY_ID' AND name ILIKE '${AGENT}%' LIMIT 1;" 2>/dev/null || echo "")
+
+        ISSUE_ID=$($DB_CMD -c "INSERT INTO issues (id, company_id, title, description, status, priority, issue_number, identifier, created_by_agent_id, created_at, updated_at) VALUES (gen_random_uuid(), '$CITA_COMPANY_ID', '$ISSUE_TITLE', '$ESCAPED_DESC', 'pending_review', 'medium', $ISSUE_NUM, 'CIT-$ISSUE_NUM', $([ -n "$AGENT_ID" ] && echo "'$AGENT_ID'" || echo NULL), now(), now()) RETURNING id;" 2>/dev/null || echo "FAILED")
+
+        if [[ "$ISSUE_ID" != "FAILED" && -n "$ISSUE_ID" ]]; then
+            echo ""
+            echo "═══════════════════════════════════════════"
+            echo "  PASSED - Sent to Paperclip for review"
+            echo "  Output: $OUTPUT_FILE"
+            echo "  Paperclip: CIT-$ISSUE_NUM (id: $ISSUE_ID)"
+            echo "═══════════════════════════════════════════"
+        else
+            echo ""
+            echo "═══════════════════════════════════════════"
+            echo "  PASSED - Ready for review"
+            echo "  Output: $OUTPUT_FILE"
+            echo "  (Paperclip issue creation failed - review manually)"
+            echo "═══════════════════════════════════════════"
+        fi
         exit 0
     else
         echo "  Validation FAILED"

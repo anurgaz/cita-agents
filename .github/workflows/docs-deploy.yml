@@ -3,16 +3,15 @@ name: Deploy Docs to GitHub Pages
 on:
   push:
     branches: [main]
-    paths:
-      - "docs/**"
-      - "agents/**"
-      - "mkdocs.yml"
-      - "index.md"
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -26,10 +25,10 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install mkdocs mkdocs-material mkdocs-kroki-plugin
+        run: pip install mkdocs mkdocs-material
 
       - name: Build docs
         run: mkdocs build

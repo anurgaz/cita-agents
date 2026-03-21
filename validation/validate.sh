@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── Main Validation Runner ─────────────────────────────────────
-# Usage: ./validate.sh <path-to-artifact>
-# Returns: exit 0 (PASSED) or exit 1 (FAILED)
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(dirname "$SCRIPT_DIR")"
 
@@ -20,9 +16,9 @@ if [[ ! -f "$ARTIFACT" ]]; then
     exit 1
 fi
 
-echo "═══════════════════════════════════════════"
+echo "======================================="
 echo "  Validating: $(basename "$ARTIFACT")"
-echo "═══════════════════════════════════════════"
+echo "======================================="
 echo ""
 
 ERRORS=()
@@ -32,18 +28,26 @@ CHECKS_FAILED=0
 
 run_check() {
     local check_name="$1"
-    local check_script="$SCRIPT_DIR/$2"
+    local check_script="$2"
 
-    echo "--- Check: $check_name ---"
-
-    if [[ ! -x "$check_script" ]]; then
-        echo "  SKIP: $check_script not found or not executable"
+    # Try SCRIPT_DIR first, then SCRIPT_DIR/rules/
+    local script_path=""
+    if [[ -x "$SCRIPT_DIR/$check_script" ]]; then
+        script_path="$SCRIPT_DIR/$check_script"
+    elif [[ -x "$SCRIPT_DIR/rules/$check_script" ]]; then
+        script_path="$SCRIPT_DIR/rules/$check_script"
+    else
+        echo "--- Check: $check_name ---"
+        echo "  SKIP: $check_script not found"
         WARNINGS+=("$check_name: script not found")
+        echo ""
         return
     fi
 
+    echo "--- Check: $check_name ---"
+
     local output
-    if output=$("$check_script" "$ARTIFACT" "$BASE_DIR" 2>&1); then
+    if output=$("$script_path" "$ARTIFACT" "$BASE_DIR" 2>&1); then
         echo "  PASSED"
         CHECKS_PASSED=$((CHECKS_PASSED + 1))
     else
@@ -63,10 +67,11 @@ run_check "Constraints Reference" "constraints-check.sh"
 run_check "Completeness" "completeness-check.sh"
 run_check "Glossary Terms" "glossary-check.sh"
 run_check "Business Rules Consistency" "consistency-check.sh"
+run_check "Diagram Syntax" "diagram-check.sh"
 
-echo "═══════════════════════════════════════════"
+echo "======================================="
 echo "  Results: $CHECKS_PASSED passed, $CHECKS_FAILED failed"
-echo "═══════════════════════════════════════════"
+echo "======================================="
 
 if [[ ${#WARNINGS[@]} -gt 0 ]]; then
     echo ""
