@@ -384,6 +384,8 @@ while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
         cd "$BASE_DIR"
         git checkout main >/dev/null 2>&1
         git pull origin main >/dev/null 2>&1
+        git branch -D "$BRANCH" 2>/dev/null || true
+        git push origin --delete "$BRANCH" 2>/dev/null || true
         git checkout -b "$BRANCH" >/dev/null 2>&1
 
         mkdir -p "$BASE_DIR/$TARGET_DIR"
