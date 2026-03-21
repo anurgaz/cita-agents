@@ -201,3 +201,43 @@ cita-agents/
 - **Интеграции:** Telegram Bot API (webhook), 2GIS Suggest API, reCAPTCHA v3
 - **Репозиторий:** [github.com/anurgaz/cita](https://github.com/anurgaz/cita)
 
+
+## C4 Архитектура
+
+```kroki-plantuml
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+
+Person(client, "Клиент", "Записывается на услуги")
+Person(provider, "Провайдер", "Управляет расписанием")
+
+System_Boundary(cita, "Cita.kz") {
+    Container(miniapp, "Telegram Mini App", "Next.js, React", "UI для клиентов")
+    Container(webview, "Web UI", "React", "Админка и лендинг")
+    Container(bot, "Telegram Bot", "Python", "Уведомления и быстрые действия")
+    Container(backend, "API Backend", "FastAPI, Python", "Бизнес-логика")
+    ContainerDb(db, "Database", "PostgreSQL", "Хранение данных")
+}
+
+System_Ext(tg, "Telegram API", "Мессенджер")
+System_Ext(gis, "2GIS API", "Геокодинг")
+
+Rel(client, miniapp, "Использует", "HTTPS")
+Rel(client, bot, "Получает уведомления", "Telegram")
+Rel(provider, webview, "Управляет салоном", "HTTPS")
+Rel(provider, bot, "Управляет записями", "Telegram")
+
+Rel(miniapp, backend, "API вызовы", "JSON/HTTPS")
+Rel(webview, backend, "API вызовы", "JSON/HTTPS")
+Rel(bot, backend, "Webhooks", "JSON/HTTPS")
+Rel(backend, db, "Чтение/Запись", "SQL/TCP")
+
+Rel(backend, tg, "Отправка сообщений", "JSON/HTTPS")
+Rel(backend, gis, "Поиск адресов", "JSON/HTTPS")
+@enduml
+```
