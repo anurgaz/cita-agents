@@ -3,40 +3,59 @@ name: Artifact Rejected - Re-run Agent
 on:
   pull_request_review:
     types: [submitted]
+  issue_comment:
+    types: [created]
 
 jobs:
   retry:
     if: >
-      github.event.review.state == 'changes_requested' &&
-      contains(github.event.pull_request.labels.*.name, 'artifact')
+      (github.event_name == 'pull_request_review' &&
+       github.event.review.state == 'changes_requested' &&
+       contains(github.event.pull_request.labels.*.name, 'artifact'))
+      ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       startsWith(github.event.comment.body, '/reject') &&
+       contains(github.event.issue.labels.*.name, 'artifact'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract info from PR
+      - name: Get PR info
         id: info
         run: |
-          TITLE="${{ github.event.pull_request.title }}"
+          if [[ "${{ github.event_name }}" == "issue_comment" ]]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+            FEEDBACK=$(echo '${{ github.event.comment.body }}' | sed 's|^/reject ||')
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+            FEEDBACK="${{ github.event.review.body }}"
+          fi
+
+          PR_DATA=$(gh pr view $PR_NUMBER --json title,headRefName)
+          TITLE=$(echo "$PR_DATA" | jq -r '.title')
+          BRANCH=$(echo "$PR_DATA" | jq -r '.headRefName')
           CIT_NUM=$(echo "$TITLE" | grep -oP 'CIT-\K[0-9]+')
           AGENT=$(echo "$TITLE" | grep -oP '\[\K[A-Z]+(?=\])' | tr '[:upper:]' '[:lower:]')
+
+          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
           echo "cit_number=$CIT_NUM" >> $GITHUB_OUTPUT
           echo "agent=$AGENT" >> $GITHUB_OUTPUT
-          echo "pr_number=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
-          echo "branch=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "feedback=$FEEDBACK" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Collect review feedback
-        id: feedback
+      - name: React to comment
+        if: github.event_name == 'issue_comment'
         run: |
-          REVIEW_BODY="${{ github.event.review.body }}"
-          echo "$REVIEW_BODY" > /tmp/feedback.txt
-          echo "Feedback:"
-          cat /tmp/feedback.txt
+          gh api repos/${{ github.repository }}/issues/comments/${{ github.event.comment.id }}/reactions -X POST -f content='rocket'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Close current PR
         run: |
-          gh pr close ${{ github.event.pull_request.number }} --comment "Автоматический re-run агента с учётом фидбэка. Новый PR будет создан."
+          gh pr close ${{ steps.info.outputs.pr_number }} --comment "Агент переделывает с учётом фидбэка. Новый PR будет создан автоматически."
           git push origin --delete ${{ steps.info.outputs.branch }} || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,10 +71,14 @@ jobs:
             export ANTHROPIC_API_KEY=$(cat /root/.anthropic_key)
 
             CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
-            ORIGINAL_TASK=$(docker exec paperclip-db-1 psql -U paperclip -d paperclip -t -A -c               "SELECT title FROM issues WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};" 2>/dev/null)
-
+            ORIGINAL_TASK=$(docker exec paperclip-db-1 psql -U paperclip -d paperclip -t -A -c \
+              "SELECT title FROM issues WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};" 2>/dev/null)
             TASK=$(echo "$ORIGINAL_TASK" | sed 's/^\[[A-Z]*\] //')
 
-            docker exec paperclip-db-1 psql -U paperclip -d paperclip -c               "UPDATE issues SET status = 'in_progress', updated_at = now() WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};"
+            docker exec paperclip-db-1 psql -U paperclip -d paperclip -c \
+              "UPDATE issues SET status = 'in_progress', updated_at = now() WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};"
 
-            ./pipeline/run-agent.sh               --agent ${{ steps.info.outputs.agent }}               --task "${TASK}"               --feedback "${{ github.event.review.body }}"
+            ./pipeline/run-agent.sh \
+              --agent ${{ steps.info.outputs.agent }} \
+              --task "${TASK}" \
+              --feedback "${{ steps.info.outputs.feedback }}"
