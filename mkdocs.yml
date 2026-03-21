@@ -1,5 +1,6 @@
 site_name: "cita.kz - AI Agents Documentation"
 site_url: https://anurgaz.github.io/cita-agents/
+docs_dir: .
 theme:
   name: material
   language: ru
