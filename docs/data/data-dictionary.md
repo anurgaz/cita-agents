@@ -255,10 +255,12 @@ skinparam backgroundColor #1e293b
 skinparam shadowing false
 skinparam defaultFontName Inter
 skinparam defaultFontColor #f8fafc
+skinparam ArrowColor #2c7a7b
+skinparam classBackgroundColor #2D3748
+skinparam classFontColor #f8fafc
+skinparam classBorderColor #2c7a7b
 skinparam EntityBackgroundColor #2D3748
 skinparam EntityBorderColor #2c7a7b
-skinparam ArrowColor #2c7a7b
-
 entity "Business" as b
 entity "User" as u
 entity "Category" as cat
