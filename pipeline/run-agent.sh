@@ -226,6 +226,102 @@ make_filename() {
         cut -c1-60
 }
 
+# ─── Render PlantUML blocks to SVG ──────────────────────────────
+render_plantuml_svgs() {
+    local artifact="$1"
+    local issue_num="$2"
+    local images_dir="$BASE_DIR/docs/artifacts/.images"
+    mkdir -p "$images_dir"
+
+    # Extract plantuml blocks and render each to SVG
+    local idx=0
+    local tmpdir
+    tmpdir=$(mktemp -d)
+    trap "rm -rf $tmpdir" RETURN
+
+    python3 - "$artifact" "$tmpdir" << 'PYEOF'
+import sys, re, os
+filepath = sys.argv[1]
+outdir = sys.argv[2]
+with open(filepath) as f:
+    content = f.read()
+blocks = list(re.finditer(r'```plantuml\s*\n(.*?)```', content, re.DOTALL))
+for i, m in enumerate(blocks):
+    code = m.group(1).strip()
+    with open(os.path.join(outdir, f"block_{i}.puml"), 'w') as out:
+        out.write(code)
+print(len(blocks))
+PYEOF
+
+    local block_count
+    block_count=$(python3 -c "
+import re, sys
+with open(sys.argv[1]) as f:
+    content = f.read()
+print(len(re.findall(r'\`\`\`plantuml\s*\n.*?\`\`\`', content, re.DOTALL)))
+" "$artifact")
+
+    if [[ "$block_count" -eq 0 ]]; then
+        return
+    fi
+
+    echo "  Rendering $block_count PlantUML diagram(s) to SVG..."
+
+    local rendered=0
+    for puml_file in "$tmpdir"/block_*.puml; do
+        [[ -f "$puml_file" ]] || continue
+        local i
+        i=$(basename "$puml_file" .puml | sed 's/block_//')
+        local svg_name="CIT-${issue_num}-diagram-${i}.svg"
+        local svg_path="$images_dir/$svg_name"
+
+        # Render with plantuml
+        plantuml -tsvg "$puml_file" -o "$tmpdir" 2>/dev/null
+        local rendered_svg="$tmpdir/block_${i}.svg"
+
+        if [[ -f "$rendered_svg" ]]; then
+            cp "$rendered_svg" "$svg_path"
+            rendered=$((rendered + 1))
+        fi
+    done
+
+    if [[ "$rendered" -eq 0 ]]; then
+        return
+    fi
+
+    # Insert ![image] references after each ```plantuml...``` block
+    python3 - "$artifact" "$images_dir" "$issue_num" << 'PYEOF'
+import sys, re, os
+
+filepath = sys.argv[1]
+images_dir = sys.argv[2]
+issue_num = sys.argv[3]
+
+with open(filepath) as f:
+    content = f.read()
+
+blocks = list(re.finditer(r'```plantuml\s*\n.*?```', content, re.DOTALL))
+
+# Process in reverse to preserve positions
+for i in range(len(blocks) - 1, -1, -1):
+    m = blocks[i]
+    end = m.end()
+    svg_name = f"CIT-{issue_num}-diagram-{i}.svg"
+    svg_path = os.path.join(images_dir, svg_name)
+    if os.path.exists(svg_path):
+        # Compute relative path from artifact to .images
+        img_ref = f"\n\n![Diagram {i}](../.images/{svg_name})\n"
+        content = content[:end] + img_ref + content[end:]
+
+with open(filepath, 'w') as f:
+    f.write(content)
+
+print(f"Inserted {len(blocks)} image reference(s)")
+PYEOF
+
+    echo "  Rendered $rendered SVG(s) into docs/artifacts/.images/"
+}
+
 # ─── Main loop with retry ───────────────────────────────────────
 USER_MESSAGE="КОНТЕКСТ:
 $CONTEXT_BLOCK
@@ -276,7 +372,12 @@ while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
 
         mkdir -p "$BASE_DIR/$TARGET_DIR"
         cp "$OUTPUT_FILE" "$BASE_DIR/$TARGET_PATH"
+
+        # Render PlantUML diagrams to SVG
+        render_plantuml_svgs "$BASE_DIR/$TARGET_PATH" "$ISSUE_NUM"
+
         git add "$TARGET_PATH"
+        git add "docs/artifacts/.images/" 2>/dev/null || true
         git commit -m "artifact(CIT-${ISSUE_NUM}): [${AGENT_UPPER}] ${TASK:0:60}" >/dev/null 2>&1
         git push origin "$BRANCH" >/dev/null 2>&1
 
