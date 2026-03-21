@@ -65,8 +65,9 @@
 - **ОБЯЗАТЕЛЬНО:** side effects (уведомления, записи в другие таблицы)
 - Rate limits: указывай даже если "нет" (TODO для будущей реализации)
 
-### Sequence Diagrams
-- Формат: Mermaid (НЕ PlantUML — GitHub не рендерит PlantUML)
+### ФОРМАТЫ ДИАГРАММ (строго)
+- **Flowchart, ER diagram → Mermaid** (```mermaid)
+- **Sequence diagram, C4 diagram → PlantUML** (```plantuml)
 - Participants: именуй по архитектурным компонентам (Client, MiniApp, Backend, DB, TelegramAPI, 2GIS)
 - **Минимум:** happy path + 2 error paths
 - Каждый вызов: HTTP method + path или SQL операция
