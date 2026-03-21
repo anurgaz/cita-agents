@@ -14,10 +14,15 @@ if [[ ! -f "$GLOSSARY" ]]; then
 fi
 
 ERRORS=()
-CONTENT=$(cat "$ARTIFACT")
+
+# Preprocess: strip code blocks, lines with quoted terms (guillemets),
+# and lines that mention forbidden terms only in negation/meta context
+CLEANED=$(cat "$ARTIFACT" | \
+    awk '/^```/{f=!f; next} !f{print}' | \
+    grep -v '«' | \
+    grep -vi 'запрещённ\|запрещен\|заменён\|заменен\|не использовать\|не используйте\|вместо .* использу')
 
 # Define forbidden terms and their correct alternatives
-# Format: "wrong_term|correct_term"
 TERM_PAIRS=(
     "бронь|запись (booking)"
     "заказ|запись (booking)"
@@ -34,15 +39,9 @@ for pair in "${TERM_PAIRS[@]}"; do
     WRONG="${pair%%|*}"
     CORRECT="${pair##*|}"
 
-    # Case-insensitive search, skip if in code blocks or quotes
-    COUNT=$(echo "$CONTENT" | grep -ciw "$WRONG" || true)
+    COUNT=$(echo "$CLEANED" | grep -ciw "$WRONG" || true)
     if [[ "$COUNT" -gt 0 ]]; then
-        # Check if it's inside a template/example block (between ```)
-        IN_CODE=$(echo "$CONTENT" | awk '/^```/{f=!f} f{print}' | grep -ciw "$WRONG" || true)
-        REAL_COUNT=$((COUNT - IN_CODE))
-        if [[ "$REAL_COUNT" -gt 0 ]]; then
-            ERRORS+=("Term '$WRONG' used $REAL_COUNT time(s). Use: $CORRECT (see glossary.md)")
-        fi
+        ERRORS+=("Term '$WRONG' used $COUNT time(s). Use: $CORRECT (see glossary.md)")
     fi
 done
 
