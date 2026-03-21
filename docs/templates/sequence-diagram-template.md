@@ -28,7 +28,8 @@
 ## Диаграмма
 
 ```kroki-plantuml
-@startuml
+@startuml\nskinparam backgroundColor #1e293b\nskinparam defaultFontColor #f8fafc\nskinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
 title {Название сценария}
 
 participant "{Actor}" as Actor
@@ -71,7 +72,8 @@ deactivate C1
 ## Мини-пример
 
 ```kroki-plantuml
-@startuml
+@startuml\nskinparam backgroundColor #1e293b\nskinparam defaultFontColor #f8fafc\nskinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
 title Клиент создает запись через Mini App
 
 participant "Клиент" as Client

@@ -6,9 +6,10 @@
 
 ```kroki-plantuml
 @startuml
-skinparam backgroundColor transparent
+skinparam backgroundColor #1e293b
 skinparam shadowing false
 skinparam defaultFontName Inter
+skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 skinparam NoteBackgroundColor transparent
@@ -208,9 +209,10 @@ cita-agents/
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
-skinparam backgroundColor transparent
+skinparam backgroundColor #1e293b
 skinparam shadowing false
 skinparam defaultFontName Inter
+skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 
 Person(client, "Клиент", "Записывается на услуги")

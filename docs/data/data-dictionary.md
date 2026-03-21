@@ -251,9 +251,10 @@ rejected   cancelled
 
 ```kroki-plantuml
 @startuml
-skinparam backgroundColor transparent
+skinparam backgroundColor #1e293b
 skinparam shadowing false
 skinparam defaultFontName Inter
+skinparam defaultFontColor #f8fafc
 skinparam EntityBackgroundColor #F7FAFC
 skinparam EntityBorderColor #2c7a7b
 skinparam ArrowColor #2c7a7b

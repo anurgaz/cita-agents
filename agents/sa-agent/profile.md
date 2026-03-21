@@ -39,9 +39,10 @@ System Analyst для сервиса онлайн-записи cita.kz.
 
 ```kroki-plantuml
 @startuml
-skinparam backgroundColor transparent
+skinparam backgroundColor #1e293b
 skinparam shadowing false
 skinparam defaultFontName Inter
+skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 
