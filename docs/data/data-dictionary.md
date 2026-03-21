@@ -249,20 +249,38 @@ rejected   cancelled
 
 ## ER-диаграмма (упрощенная)
 
-```
-Business (1) ---< (N) User
-    |
-    |---< (N) Category ---< (N) Service >---< (N) Master
-    |                           |                    |
-    |---< (N) Schedule (business-level)              |
-    |                                         Schedule (master-level)
-    |
-    |---< (N) Client
-    |
-    |---< (N) Booking ---< (N) RescheduleProposal
-                |
-                v
-         Subscription (polymorphic via context_type + context_ref)
+```kroki-plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam EntityBackgroundColor #F7FAFC
+skinparam EntityBorderColor #2c7a7b
+skinparam ArrowColor #2c7a7b
+
+entity "Business" as b
+entity "User" as u
+entity "Category" as cat
+entity "Service" as svc
+entity "Master" as master
+entity "Schedule\n(business-level)" as sch_b
+entity "Schedule\n(master-level)" as sch_m
+entity "Client" as cli
+entity "Booking" as bkg
+entity "RescheduleProposal" as rsp
+entity "Subscription" as sub
+
+b ||--o{ u : "1 : N"
+b ||--o{ cat : "1 : N"
+cat ||--o{ svc : "1 : N"
+svc }o--o{ master : "N : N"
+b ||--o{ sch_b : "1 : N"
+master ||--o{ sch_m : "1 : N"
+b ||--o{ cli : "1 : N"
+b ||--o{ bkg : "1 : N"
+bkg ||--o{ rsp : "1 : N"
+bkg ||--o{ sub : "1 : N (polymorphic)"
+@enduml
 ```
 
 ---

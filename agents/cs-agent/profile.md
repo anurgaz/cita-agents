@@ -45,13 +45,28 @@ Telegram (чат с клиентами-бизнесами).
 
 ## Взаимодействие с другими агентами
 
-```
-Клиент -> [CS] -> Ответ клиенту
-              |-> Bug-тикет -> GitHub Issues -> Разработчик
-              |-> Жалоба ----> PO (эскалация)
-              |-> Паттерны --> [BA] (новые user stories)
+```kroki-plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
 
-[TW] -> How-to Guides -> [CS] (база знаний)
+actor "Клиент" as client
+rectangle "CS Agent" as cs #B2F5EA
+rectangle "TW Agent\n(How-to Guides)" as tw #81E6D9
+actor "Разработчик" as dev
+actor "PO" as po
+rectangle "BA Agent" as ba #B2F5EA
+
+client -> cs : Вопрос / Проблема
+tw -> cs : База знаний
+cs -> client : Ответ клиенту
+cs -> dev : Bug-тикет -> GitHub Issues
+cs -> po : Жалоба (эскалация)
+cs -> ba : Паттерны (новые user stories)
+@enduml
 ```
 
 - **TW -> CS:** How-to guides как база знаний для ответов

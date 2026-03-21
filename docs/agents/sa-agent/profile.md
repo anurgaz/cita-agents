@@ -37,13 +37,36 @@ System Analyst для сервиса онлайн-записи cita.kz.
 
 ## Взаимодействие с другими агентами
 
-```
-[BA] -> User Story -> [SA] -> API Spec ------> Разработчик
-                          |-> Sequence Diagram -> Code Review
-                          |-> Test Cases -------> QA
-                          |-> Вопросы ----------> [BA]
-                          |
-                     [TW] -> as-is docs ------> [SA] (читает для контекста)
+```kroki-plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
+
+rectangle "BA Agent" as ba #B2F5EA
+rectangle "User Story" as us #E6FFFA
+rectangle "SA Agent" as sa #81E6D9
+rectangle "TW Agent /\nas-is docs" as tw #81E6D9
+rectangle "API Spec" as api #E6FFFA
+rectangle "Sequence Diagram" as seq #E6FFFA
+rectangle "Test Cases" as tc #E6FFFA
+actor "Разработчик" as dev
+actor "Code Review" as cr
+actor "QA" as qa
+
+ba -> us : передет
+us -> sa : на вход
+tw -> sa : читает для контекста
+sa -> ba : Вопросы
+sa -> api : генерирует
+sa -> seq : генерирует
+sa -> tc : генерирует
+api -> dev : реализует
+seq -> cr : ревьюит
+tc -> qa : тестирует
+@enduml
 ```
 
 - **BA -> SA:** user story как входные данные

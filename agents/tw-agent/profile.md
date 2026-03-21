@@ -60,12 +60,30 @@ Technical Writer для сервиса онлайн-записи cita.kz.
 
 ## Взаимодействие с другими агентами
 
-```
-[Деплой в main] -> [TW] -> Обновленная документация
-                              |
-                              |-> API Reference -> [CS] (база знаний)
-                              |-> How-to Guides -> [CS] (ответы клиентам)
-                              |-> as-is docs ----> [SA] (контекст для проектирования)
+```kroki-plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
+
+rectangle "Деплой в main" as code #E2E8F0
+rectangle "TW Agent" as tw #81E6D9
+rectangle "API Reference" as api #E6FFFA
+rectangle "How-to Guides" as guides #E6FFFA
+rectangle "as-is docs" as docs #E6FFFA
+rectangle "CS Agent" as cs #B2F5EA
+rectangle "SA Agent" as sa #81E6D9
+
+code -> tw : Триггер
+tw -> api : Создает
+tw -> guides : Создает
+tw -> docs : Создает
+api -> cs : База знаний
+guides -> cs : Ответы клиентам
+docs -> sa : Контекст для проектирования
+@enduml
 ```
 
 - **SA -> TW:** SA создает спеку (план), TW документирует реализацию (факт)

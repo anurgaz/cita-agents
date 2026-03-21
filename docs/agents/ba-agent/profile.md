@@ -35,9 +35,29 @@ Business Analyst для сервиса онлайн-записи cita.kz.
 
 ## Взаимодействие с другими агентами
 
-```
-Пользователь -> [BA] -> User Story -> [SA] -> API Spec + Tests
-                                           -> [TW] -> Documentation
+```kroki-plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
+
+actor "Пользователь" as po
+rectangle "BA Agent" as ba #B2F5EA
+rectangle "User Story" as us #E6FFFA
+rectangle "SA Agent" as sa #81E6D9
+rectangle "API Spec + Tests" as api #E6FFFA
+rectangle "TW Agent" as tw #81E6D9
+rectangle "Documentation" as docs #E6FFFA
+
+po -> ba : Требования
+ba -> us : Создает
+us -> sa : Передает
+sa -> api : Создает
+us -> tw : Передает (косвенно)
+tw -> docs : Создает
+@enduml
 ```
 
 - **BA -> SA:** передает user story для технической проработки
