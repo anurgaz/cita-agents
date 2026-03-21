@@ -4,80 +4,58 @@ AI-агенты для проекта онлайн-записи [cita.kz](https:
 
 ## Архитектура
 
+Система состоит из 3 компонентов: Paperclip (задачи), VPS (агенты), GitHub (ревью + документация).
+
 ```mermaid
-C4Context
-    title cita-agents — Системная архитектура
+graph LR
+    Paperclip["<b>Paperclip</b><br/>Задачи CIT-N<br/>Статусы"]
+    VPS["<b>cita-agents VPS</b><br/>4 AI-агента<br/>Валидация<br/>Claude API"]
+    GH["<b>GitHub</b><br/>Pull Requests<br/>Actions<br/>Pages"]
+    Reviewer((Ревьювер))
 
-    Person(reviewer, "Ревьювер", "Проверяет артефакты в GitHub PR")
-
-    System_Boundary(paperclip, "Paperclip Platform") {
-        System(paperclip_api, "Paperclip API", "Управление задачами CIT-N")
-        SystemDb(paperclip_db, "PostgreSQL", "issues, статусы")
-    }
-
-    System_Boundary(agents, "cita-agents (VPS)") {
-        System(pipeline, "run-agent.sh", "Оркестратор: Claude API → валидация → PR")
-        System(ba, "BA Agent", "User stories, AC, бизнес-правила")
-        System(sa, "SA Agent", "API specs, sequence diagrams, test cases")
-        System(tw, "TW Agent", "API reference, how-to guides")
-        System(cs, "CS Agent", "Ответы клиентам, bug-тикеты")
-        System(validation, "Validation (5 checks)", "constraints, completeness, glossary, consistency, diagrams")
-    }
-
-    System_Boundary(github, "GitHub") {
-        System(repo, "anurgaz/cita-agents", "Git repo + GitHub Pages")
-        System(actions, "GitHub Actions", "Auto approve/reject workflows")
-        System(pages, "GitHub Pages", "MkDocs Material + Mermaid + PlantUML")
-    }
-
-    Rel(paperclip_api, pipeline, "Задача CIT-N")
-    Rel(pipeline, ba, "prompt")
-    Rel(pipeline, sa, "prompt")
-    Rel(pipeline, tw, "prompt")
-    Rel(pipeline, cs, "prompt")
-    Rel(pipeline, validation, "artifact.md")
-    Rel(pipeline, repo, "git push + gh pr create")
-    Rel(reviewer, repo, "/approve или /reject")
-    Rel(actions, pipeline, "SSH re-run с --feedback")
-    Rel(actions, paperclip_db, "UPDATE status")
-    Rel(repo, pages, "deploy")
+    Paperclip -->|"задача"| VPS
+    VPS -->|"PR с артефактом"| GH
+    Reviewer -->|"/approve  /reject"| GH
+    GH -->|"re-run + feedback"| VPS
+    GH -->|"status update"| Paperclip
 ```
 
-> **Примечание:** C4 диаграмма выше не рендерится нативно в GitHub. Ниже — Mermaid-версия:
+### Внутренняя архитектура VPS
 
 ```mermaid
 graph TB
-    subgraph Paperclip["Paperclip Platform"]
-        PDB[(PostgreSQL<br/>issues, статусы)]
+    subgraph Pipeline["run-agent.sh — Оркестратор"]
+        direction TB
+        Select{"Выбор агента<br/>--agent"}
+        Select --> BA["BA Agent<br/>User stories, AC"]
+        Select --> SA["SA Agent<br/>API specs, diagrams"]
+        Select --> TW["TW Agent<br/>API reference, guides"]
+        Select --> CS["CS Agent<br/>Ответы, bug-тикеты"]
     end
 
-    subgraph VPS["cita-agents VPS"]
-        Pipeline["run-agent.sh<br/>Оркестратор"]
-        BA["BA Agent<br/>User stories, AC"]
-        SA["SA Agent<br/>API specs, diagrams"]
-        TW["TW Agent<br/>API reference, guides"]
-        CS["CS Agent<br/>Ответы, bug-тикеты"]
-        VAL["Validation<br/>5 checks"]
+    subgraph LLM["Claude API"]
+        Sonnet["Claude Sonnet"]
     end
 
-    subgraph GitHub
-        Repo["anurgaz/cita-agents<br/>Git repo"]
-        Actions["GitHub Actions<br/>approve / reject"]
-        Pages["GitHub Pages<br/>MkDocs + Mermaid + PlantUML"]
+    subgraph Val["Validation — 5 checks"]
+        V1["Constraints"]
+        V2["Completeness"]
+        V3["Glossary"]
+        V4["Consistency"]
+        V5["Diagrams"]
     end
 
-    Reviewer((Ревьювер))
+    subgraph Publish["Публикация"]
+        Render["PlantUML → SVG"]
+        Git["git push<br/>review/CIT-N"]
+        PR["gh pr create<br/>label: artifact"]
+    end
 
-    PDB -->|"Задача CIT-N"| Pipeline
-    Pipeline --> BA & SA & TW & CS
-    BA & SA & TW & CS -->|"artifact.md"| VAL
-    VAL -->|"PASSED"| Pipeline
-    Pipeline -->|"git push + PR"| Repo
-    Reviewer -->|"/approve /reject"| Repo
-    Repo --> Actions
-    Actions -->|"SSH re-run + --feedback"| Pipeline
-    Actions -->|"UPDATE status"| PDB
-    Repo -->|"deploy"| Pages
+    BA & SA & TW & CS -->|"system prompt<br/>+ context"| Sonnet
+    Sonnet -->|"artifact.md"| Val
+    Val -->|"FAIL retry ≤3"| Sonnet
+    Val -->|"PASS"| Render
+    Render --> Git --> PR
 ```
 
 ## Workflow агентов
