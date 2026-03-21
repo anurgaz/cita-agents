@@ -1,6 +1,19 @@
 # cita-agents
 
-AI-агенты для проекта онлайн-записи [cita.kz](https://cita.kz) — салоны красоты, Казахстан, Telegram Mini App.
+4 AI-агента, которые генерируют проектную документацию для [cita.kz](https://cita.kz) (онлайн-запись в салоны красоты, Казахстан, Telegram Mini App).
+
+**Проблема:** документация отстаёт от кода. User stories, API-спеки, гайды и ответы саппорта пишутся вручную, медленно и несогласованно.
+
+**Решение:** агенты генерируют артефакты через Claude API, автоматически валидируют их по бизнес-правилам и глоссарию, создают PR для ревью. Ревьювер пишет `/approve` или `/reject <фидбэк>` — агент либо публикует, либо переделывает.
+
+## Ссылки
+
+| | |
+|---|---|
+| **Документация** | [anurgaz.github.io/cita-agents](https://anurgaz.github.io/cita-agents) |
+| **Основной продукт** | [github.com/anurgaz/cita](https://github.com/anurgaz/cita) |
+| **Задачи** | [Paperclip — проект CIT](https://app.paperclip.co) |
+| **AI Model** | Claude Sonnet (Anthropic API) |
 
 ## Архитектура
 
