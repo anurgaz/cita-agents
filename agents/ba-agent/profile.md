@@ -35,30 +35,14 @@ Business Analyst для сервиса онлайн-записи cita.kz.
 
 ## Взаимодействие с другими агентами
 
-```kroki-plantuml
-@startuml
-skinparam backgroundColor #1e293b
-skinparam shadowing false
-skinparam defaultFontName Inter
-skinparam defaultFontColor #f8fafc
-skinparam ArrowColor #2c7a7b
-skinparam RectangleBorderColor #2c7a7b
-
-actor "Пользователь" as po
-rectangle "BA Agent" as ba #2C7A7B
-rectangle "User Story" as us #234E52
-rectangle "SA Agent" as sa #319795
-rectangle "API Spec + Tests" as api #234E52
-rectangle "TW Agent" as tw #319795
-rectangle "Documentation" as docs #234E52
-
-po -> ba : Требования
-ba -> us : Создает
-us -> sa : Передает
-sa -> api : Создает
-us -> tw : Передает (косвенно)
-tw -> docs : Создает
-@enduml
+```mermaid
+graph LR
+    PO["Пользователь"] --> BA["BA Agent"]
+    BA --> US["User Story"]
+    US --> SA["SA Agent"]
+    SA --> API["API Spec + Tests"]
+    US -.-> TW["TW Agent"]
+    TW --> DOCS["Documentation"]
 ```
 
 - **BA -> SA:** передает user story для технической проработки
@@ -75,8 +59,3 @@ tw -> docs : Создает
 - Все термины из glossary.md
 - Ссылки на business rules для каждого затронутого правила
 - Out of Scope явно определен
-\nskinparam backgroundColor #1e293b
-skinparam shadowing false
-skinparam defaultFontName Inter
-skinparam defaultFontColor #f8fafc
-skinparam ArrowColor #2c7a7b

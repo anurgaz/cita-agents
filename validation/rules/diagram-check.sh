@@ -1,35 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# ─── Diagram Validation via Claude API ───────────────────────────
-# Checks mermaid/plantuml diagrams in a .md file for syntax errors.
-# Usage: ./diagram-check.sh [--fix] <artifact.md>
-# Requires: ANTHROPIC_API_KEY, jq, curl
-
-FIX_MODE=false
-if [[ "${1:-}" == "--fix" ]]; then
-    FIX_MODE=true
-    shift
-fi
+# ─── Diagram Validation ─────────────────────────────────────────
+# 1. Flags PlantUML as ERROR (GitHub doesn't render it)
+# 2. Validates Mermaid syntax via Claude API
+# Usage: ./diagram-check.sh <artifact.md> <base_dir>
 
 ARTIFACT="${1:-}"
-if [[ -z "$ARTIFACT" || ! -f "$ARTIFACT" ]]; then
-    echo "Usage: $0 [--fix] <artifact.md>"
-    exit 1
-fi
+BASE_DIR="${2:-}"
 
-if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-    echo "ANTHROPIC_API_KEY not set, skipping diagram check"
+if [[ -z "$ARTIFACT" || ! -f "$ARTIFACT" ]]; then
     exit 0
 fi
 
-ERRORS=0
-FIXED=0
-TMPDIR=$(mktemp -d)
-trap "rm -rf $TMPDIR" EXIT
+ERRORS=()
 
-# Extract diagram blocks: ```mermaid...``` and ```plantuml...``` and @startuml...@enduml
-python3 - "$ARTIFACT" "$TMPDIR" << 'PYEOF'
+# ─── Check 1: Flag PlantUML usage ───────────────────────────────
+PUML_COUNT=$(grep -c "@startuml\|plantuml" "$ARTIFACT" 2>/dev/null || true)
+if [[ "$PUML_COUNT" -gt 0 ]]; then
+    ERRORS+=("PlantUML detected ($PUML_COUNT occurrences). Use Mermaid instead — GitHub and Pages don't render PlantUML.")
+fi
+
+# ─── Check 2: Validate Mermaid blocks via Claude API ────────────
+if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
+    TMPDIR=$(mktemp -d)
+    trap "rm -rf $TMPDIR" EXIT
+
+    # Extract mermaid blocks
+    python3 - "$ARTIFACT" "$TMPDIR" << 'PYEOF'
 import sys, re
 
 filepath = sys.argv[1]
@@ -38,176 +36,57 @@ outdir = sys.argv[2]
 with open(filepath) as f:
     content = f.read()
 
-# Match fenced code blocks: ```mermaid or ```plantuml
-fenced = re.finditer(r'```(mermaid|plantuml)\s*\n(.*?)```', content, re.DOTALL)
-idx = 0
-for m in fenced:
-    lang = m.group(1)
-    code = m.group(2).strip()
-    with open(f"{outdir}/block_{idx}.{lang}", 'w') as out:
-        out.write(code)
-    # Store position for replacement
-    with open(f"{outdir}/block_{idx}.pos", 'w') as out:
-        out.write(f"{m.start()}:{m.end()}")
-    idx += 1
-
-# Match @startuml...@enduml blocks (not inside fenced blocks)
-puml = re.finditer(r'(@startuml.*?@enduml)', content, re.DOTALL)
-for m in puml:
+blocks = list(re.finditer(r'```mermaid\s*\n(.*?)```', content, re.DOTALL))
+for idx, m in enumerate(blocks):
     code = m.group(1).strip()
-    # Skip if inside a fenced block
-    before = content[:m.start()]
-    open_fences = before.count('```')
-    if open_fences % 2 == 0:  # Not inside a fence
-        with open(f"{outdir}/block_{idx}.plantuml", 'w') as out:
-            out.write(code)
-        with open(f"{outdir}/block_{idx}.pos", 'w') as out:
-            out.write(f"{m.start()}:{m.end()}")
-        idx += 1
-
-print(idx)
-PYEOF
-
-BLOCK_COUNT=$(python3 - "$ARTIFACT" "$TMPDIR" << 'PYEOF'
-import sys, re, os
-
-filepath = sys.argv[1]
-outdir = sys.argv[2]
-
-with open(filepath) as f:
-    content = f.read()
-
-fenced = list(re.finditer(r'```(mermaid|plantuml)\s*\n(.*?)```', content, re.DOTALL))
-idx = 0
-for m in fenced:
-    lang = m.group(1)
-    code = m.group(2).strip()
-    with open(f"{outdir}/block_{idx}.{lang}", 'w') as out:
+    with open(f"{outdir}/block_{idx}.mermaid", 'w') as out:
         out.write(code)
-    with open(f"{outdir}/block_{idx}.pos", 'w') as out:
-        out.write(f"{m.start()}:{m.end()}")
-    idx += 1
 
-print(idx)
+print(len(blocks))
 PYEOF
-)
 
-if [[ "$BLOCK_COUNT" -eq 0 ]]; then
-    # No diagrams found — pass
-    exit 0
-fi
-
-echo "  Found $BLOCK_COUNT diagram block(s) in $(basename "$ARTIFACT")"
-
-# Validate each block via Claude API
-for block_file in "$TMPDIR"/block_*.mermaid "$TMPDIR"/block_*.plantuml; do
-    [[ -f "$block_file" ]] || continue
-
-    LANG="${block_file##*.}"
-    BLOCK_NAME=$(basename "$block_file")
-    BLOCK_IDX="${BLOCK_NAME%%.*}"
-    CODE=$(cat "$block_file")
-
-    echo -n "  Checking $LANG block... "
-
-    PROMPT="Check this $LANG diagram for syntax errors. Reply STRICTLY in this format:
-STATUS: VALID
-or
-STATUS: INVALID
-ERRORS:
-- error description
-FIXED:
-\`\`\`$LANG
-corrected code here
-\`\`\`
-
-Diagram to check:
-\`\`\`$LANG
-$CODE
-\`\`\`"
-
-    RESPONSE=$(curl -s -X POST "https://api.anthropic.com/v1/messages" \
-        -H "Content-Type: application/json" \
-        -H "x-api-key: $ANTHROPIC_API_KEY" \
-        -H "anthropic-version: 2023-06-01" \
-        -d "$(jq -n --arg prompt "$PROMPT" '{
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 2048,
-            messages: [{role: "user", content: $prompt}]
-        }')" 2>/dev/null)
-
-    REPLY=$(echo "$RESPONSE" | jq -r '.content[0].text // "ERROR"')
-
-    if echo "$REPLY" | grep -q "STATUS: VALID"; then
-        echo "VALID"
-    elif echo "$REPLY" | grep -q "STATUS: INVALID"; then
-        echo "INVALID"
-        ERRORS=$((ERRORS + 1))
-
-        # Show errors
-        echo "$REPLY" | sed -n '/^ERRORS:/,/^FIXED:/p' | head -10 | sed 's/^/    /'
-
-        if [[ "$FIX_MODE" == "true" ]]; then
-            # Extract fixed code
-            FIXED_CODE=$(echo "$REPLY" | sed -n "/^\`\`\`$LANG/,/^\`\`\`/p" | sed '1d;$d')
-            if [[ -n "$FIXED_CODE" ]]; then
-                echo "$FIXED_CODE" > "$block_file.fixed"
-                FIXED=$((FIXED + 1))
-                echo "    -> Fixed version saved"
-            fi
-        fi
-    else
-        echo "SKIP (API error)"
-    fi
-done
-
-# Apply fixes if --fix mode and fixes exist
-if [[ "$FIX_MODE" == "true" && "$FIXED" -gt 0 ]]; then
-    echo "  Applying $FIXED fix(es) to $(basename "$ARTIFACT")..."
-
-    python3 - "$ARTIFACT" "$TMPDIR" << 'PYEOF'
-import sys, re, os
-
-filepath = sys.argv[1]
-tmpdir = sys.argv[2]
-
-with open(filepath) as f:
+    BLOCK_COUNT=$(python3 -c "
+import re, sys
+with open(sys.argv[1]) as f:
     content = f.read()
+blocks = re.findall(r'\`\`\`mermaid\s*\n.*?\`\`\`', content, re.DOTALL)
+print(len(blocks))
+" "$ARTIFACT")
 
-# Collect all fixes
-fixes = []
-for fname in sorted(os.listdir(tmpdir)):
-    if fname.endswith('.fixed'):
-        base = fname.replace('.fixed', '')
-        idx = base.split('.')[0]  # block_0
-        lang = base.split('.')[1]  # mermaid or plantuml
-        pos_file = os.path.join(tmpdir, f"{idx}.pos")
-        if os.path.exists(pos_file):
-            with open(pos_file) as f2:
-                start, end = map(int, f2.read().strip().split(':'))
-            with open(os.path.join(tmpdir, fname)) as f2:
-                fixed_code = f2.read().strip()
-            fixes.append((start, end, lang, fixed_code))
+    if [[ "$BLOCK_COUNT" -gt 0 ]]; then
+        for block_file in "$TMPDIR"/block_*.mermaid; do
+            [[ -f "$block_file" ]] || continue
+            CODE=$(cat "$block_file")
 
-# Apply in reverse order to preserve positions
-fixes.sort(key=lambda x: x[0], reverse=True)
-for start, end, lang, fixed_code in fixes:
-    original = content[start:end]
-    if original.startswith('```'):
-        replacement = f"```{lang}\n{fixed_code}\n```"
-    else:
-        replacement = fixed_code
-    content = content[:start] + replacement + content[end:]
+            RESPONSE=$(curl -s -X POST "https://api.anthropic.com/v1/messages" \
+                -H "Content-Type: application/json" \
+                -H "x-api-key: $ANTHROPIC_API_KEY" \
+                -H "anthropic-version: 2023-06-01" \
+                -d "$(jq -n --arg prompt "Check this Mermaid diagram for syntax errors. Reply ONLY 'VALID' or 'INVALID: reason'.
 
-with open(filepath, 'w') as f:
-    f.write(content)
+\`\`\`mermaid
+$CODE
+\`\`\`" '{
+                    model: "claude-haiku-4-5-20251001",
+                    max_tokens: 256,
+                    messages: [{role: "user", content: $prompt}]
+                }')" 2>/dev/null)
 
-print(f"Applied {len(fixes)} fix(es)")
-PYEOF
+            REPLY=$(echo "$RESPONSE" | jq -r '.content[0].text // "SKIP"' 2>/dev/null)
+
+            if echo "$REPLY" | grep -qi "INVALID"; then
+                REASON=$(echo "$REPLY" | head -1)
+                ERRORS+=("Mermaid syntax error: $REASON")
+            fi
+        done
+    fi
 fi
 
-if [[ "$ERRORS" -gt 0 && "$FIX_MODE" != "true" ]]; then
-    echo "$ERRORS diagram(s) have syntax errors"
+# ─── Output ─────────────────────────────────────────────────────
+if [[ ${#ERRORS[@]} -gt 0 ]]; then
+    for e in "${ERRORS[@]}"; do
+        echo "$e"
+    done
     exit 1
 fi
 

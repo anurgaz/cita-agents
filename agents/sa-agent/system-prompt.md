@@ -66,7 +66,7 @@
 - Rate limits: указывай даже если "нет" (TODO для будущей реализации)
 
 ### Sequence Diagrams
-- Формат: PlantUML
+- Формат: Mermaid (НЕ PlantUML — GitHub не рендерит PlantUML)
 - Participants: именуй по архитектурным компонентам (Client, MiniApp, Backend, DB, TelegramAPI, 2GIS)
 - **Минимум:** happy path + 2 error paths
 - Каждый вызов: HTTP method + path или SQL операция
