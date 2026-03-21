@@ -75,3 +75,25 @@ tw -> docs : Создает
 - Все термины из glossary.md
 - Ссылки на business rules для каждого затронутого правила
 - Out of Scope явно определен
+\nskinparam backgroundColor #1e293b
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam defaultFontColor #f8fafc
+skinparam ArrowColor #2c7a7b
+skinparam classBackgroundColor #2D3748
+skinparam classFontColor #f8fafc
+skinparam classBorderColor #2c7a7b
+skinparam EntityBackgroundColor #2D3748
+skinparam EntityBorderColor #2c7a7b
+skinparam ActorBackgroundColor #2D3748
+skinparam ActorBorderColor #81E6D9
+skinparam ActorFontColor #f8fafc
+skinparam ParticipantBackgroundColor #2D3748
+skinparam ParticipantBorderColor #2c7a7b
+skinparam ParticipantFontColor #f8fafc
+skinparam DatabaseBackgroundColor #2D3748
+skinparam DatabaseBorderColor #2c7a7b
+skinparam DatabaseFontColor #f8fafc
+skinparam NoteBackgroundColor #2D3748
+skinparam NoteBorderColor #2c7a7b
+skinparam NoteFontColor #f8fafc

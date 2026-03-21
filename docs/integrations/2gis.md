@@ -92,7 +92,29 @@ skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 
-participant "Frontend\n(React)" as fe
+participant "Frontend\nskinparam backgroundColor #1e293b
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam defaultFontColor #f8fafc
+skinparam ArrowColor #2c7a7b
+skinparam classBackgroundColor #2D3748
+skinparam classFontColor #f8fafc
+skinparam classBorderColor #2c7a7b
+skinparam EntityBackgroundColor #2D3748
+skinparam EntityBorderColor #2c7a7b
+skinparam ActorBackgroundColor #2D3748
+skinparam ActorBorderColor #81E6D9
+skinparam ActorFontColor #f8fafc
+skinparam ParticipantBackgroundColor #2D3748
+skinparam ParticipantBorderColor #2c7a7b
+skinparam ParticipantFontColor #f8fafc
+skinparam DatabaseBackgroundColor #2D3748
+skinparam DatabaseBorderColor #2c7a7b
+skinparam DatabaseFontColor #f8fafc
+skinparam NoteBackgroundColor #2D3748
+skinparam NoteBorderColor #2c7a7b
+skinparam NoteFontColor #f8fafc
+\n(React)" as fe
 participant "Backend\n(FastAPI proxy)" as be
 participant "2GIS API\n(Suggest API)" as gis
 

@@ -95,7 +95,29 @@ skinparam RectangleBorderColor #2c7a7b
 rectangle "PO / Stakeholder" as PO #234E52
 rectangle "BA Agent" as BA #2C7A7B
 rectangle "SA Agent" as SA #319795
-rectangle "Разработка + Деплой\n(человек)" as DEV #9B2C2C
+rectangle "Разработка + Деплой\nskinparam backgroundColor #1e293b
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam defaultFontColor #f8fafc
+skinparam ArrowColor #2c7a7b
+skinparam classBackgroundColor #2D3748
+skinparam classFontColor #f8fafc
+skinparam classBorderColor #2c7a7b
+skinparam EntityBackgroundColor #2D3748
+skinparam EntityBorderColor #2c7a7b
+skinparam ActorBackgroundColor #2D3748
+skinparam ActorBorderColor #81E6D9
+skinparam ActorFontColor #f8fafc
+skinparam ParticipantBackgroundColor #2D3748
+skinparam ParticipantBorderColor #2c7a7b
+skinparam ParticipantFontColor #f8fafc
+skinparam DatabaseBackgroundColor #2D3748
+skinparam DatabaseBorderColor #2c7a7b
+skinparam DatabaseFontColor #f8fafc
+skinparam NoteBackgroundColor #2D3748
+skinparam NoteBorderColor #2c7a7b
+skinparam NoteFontColor #f8fafc
+\n(человек)" as DEV #9B2C2C
 rectangle "TW Agent" as TW #319795
 rectangle "CS Agent" as CS #2C7A7B
 rectangle "Tech Lead" as TL #9B2C2C
