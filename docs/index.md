@@ -12,8 +12,6 @@ skinparam defaultFontName Inter
 skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
-skinparam NoteBackgroundColor transparent
-skinparam NoteBorderColor transparent
 
 package "ДО РАЗРАБОТКИ" {
     rectangle "BA Agent\n(что?)" as BA #2C7A7B

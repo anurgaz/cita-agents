@@ -54,23 +54,6 @@ skinparam shadowing false
 skinparam defaultFontName Inter
 skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
-skinparam classBackgroundColor #2D3748
-skinparam classFontColor #f8fafc
-skinparam classBorderColor #2c7a7b
-skinparam EntityBackgroundColor #2D3748
-skinparam EntityBorderColor #2c7a7b
-skinparam ActorBackgroundColor #2D3748
-skinparam ActorBorderColor #81E6D9
-skinparam ActorFontColor #f8fafc
-skinparam ParticipantBackgroundColor #2D3748
-skinparam ParticipantBorderColor #2c7a7b
-skinparam ParticipantFontColor #f8fafc
-skinparam DatabaseBackgroundColor #2D3748
-skinparam DatabaseBorderColor #2c7a7b
-skinparam DatabaseFontColor #f8fafc
-skinparam NoteBackgroundColor #2D3748
-skinparam NoteBorderColor #2c7a7b
-skinparam NoteFontColor #f8fafc
 \nas-is docs" as tw #319795
 rectangle "API Spec" as api #234E52
 rectangle "Sequence Diagram" as seq #234E52
