@@ -1,43 +1,145 @@
 # cita-agents
 
-4 AI-агента для проекта онлайн-записи [cita.kz](https://cita.kz) (Казахстан, салоны красоты, Telegram Mini App).
+AI-агенты для проекта онлайн-записи [cita.kz](https://cita.kz) — салоны красоты, Казахстан, Telegram Mini App.
 
 ## Архитектура
 
-```
-         ДО РАЗРАБОТКИ                    ПОСЛЕ ДЕПЛОЯ
-  ┌──────────┐    ┌──────────┐           ┌──────────┐    ┌──────────┐
-  │ BA Agent │───>│ SA Agent │──> Dev ──>│ TW Agent │───>│ CS Agent │
-  │ (что?)   │    │ (как?)   │   Code    │ (docs)   │    │ (support)│
-  └──────────┘    └──────────┘           └──────────┘    └──────────┘
-   User Story      API Spec              API Reference    Ответы
-   AC (G/W/T)      Sequence Diag         How-to Guides    Bug-тикеты
-   Бизнес-правила  Test Cases            Changelog        Эскалации
+```mermaid
+C4Context
+    title cita-agents — Системная архитектура
+
+    Person(reviewer, "Ревьювер", "Проверяет артефакты в GitHub PR")
+
+    System_Boundary(paperclip, "Paperclip Platform") {
+        System(paperclip_api, "Paperclip API", "Управление задачами CIT-N")
+        SystemDb(paperclip_db, "PostgreSQL", "issues, статусы")
+    }
+
+    System_Boundary(agents, "cita-agents (VPS)") {
+        System(pipeline, "run-agent.sh", "Оркестратор: Claude API → валидация → PR")
+        System(ba, "BA Agent", "User stories, AC, бизнес-правила")
+        System(sa, "SA Agent", "API specs, sequence diagrams, test cases")
+        System(tw, "TW Agent", "API reference, how-to guides")
+        System(cs, "CS Agent", "Ответы клиентам, bug-тикеты")
+        System(validation, "Validation (5 checks)", "constraints, completeness, glossary, consistency, diagrams")
+    }
+
+    System_Boundary(github, "GitHub") {
+        System(repo, "anurgaz/cita-agents", "Git repo + GitHub Pages")
+        System(actions, "GitHub Actions", "Auto approve/reject workflows")
+        System(pages, "GitHub Pages", "MkDocs Material + Mermaid + PlantUML")
+    }
+
+    Rel(paperclip_api, pipeline, "Задача CIT-N")
+    Rel(pipeline, ba, "prompt")
+    Rel(pipeline, sa, "prompt")
+    Rel(pipeline, tw, "prompt")
+    Rel(pipeline, cs, "prompt")
+    Rel(pipeline, validation, "artifact.md")
+    Rel(pipeline, repo, "git push + gh pr create")
+    Rel(reviewer, repo, "/approve или /reject")
+    Rel(actions, pipeline, "SSH re-run с --feedback")
+    Rel(actions, paperclip_db, "UPDATE status")
+    Rel(repo, pages, "deploy")
 ```
 
-**Поток работы:**
-1. **BA** — формализует требования в user stories (что нужно сделать?)
-2. **SA** — проектирует техническую реализацию (как реализовать?)
-3. **Developer** — пишет код по спекам SA
-4. **Deploy** в main
-5. **TW** — документирует реальное состояние по коду (как работает сейчас?)
-6. **CS** — помогает клиентам на основе документации TW (как использовать?)
+> **Примечание:** C4 диаграмма выше не рендерится нативно в GitHub. Ниже — Mermaid-версия:
+
+```mermaid
+graph TB
+    subgraph Paperclip["Paperclip Platform"]
+        PDB[(PostgreSQL<br/>issues, статусы)]
+    end
+
+    subgraph VPS["cita-agents VPS"]
+        Pipeline["run-agent.sh<br/>Оркестратор"]
+        BA["BA Agent<br/>User stories, AC"]
+        SA["SA Agent<br/>API specs, diagrams"]
+        TW["TW Agent<br/>API reference, guides"]
+        CS["CS Agent<br/>Ответы, bug-тикеты"]
+        VAL["Validation<br/>5 checks"]
+    end
+
+    subgraph GitHub
+        Repo["anurgaz/cita-agents<br/>Git repo"]
+        Actions["GitHub Actions<br/>approve / reject"]
+        Pages["GitHub Pages<br/>MkDocs + Mermaid + PlantUML"]
+    end
+
+    Reviewer((Ревьювер))
+
+    PDB -->|"Задача CIT-N"| Pipeline
+    Pipeline --> BA & SA & TW & CS
+    BA & SA & TW & CS -->|"artifact.md"| VAL
+    VAL -->|"PASSED"| Pipeline
+    Pipeline -->|"git push + PR"| Repo
+    Reviewer -->|"/approve /reject"| Repo
+    Repo --> Actions
+    Actions -->|"SSH re-run + --feedback"| Pipeline
+    Actions -->|"UPDATE status"| PDB
+    Repo -->|"deploy"| Pages
+```
+
+## Workflow агентов
+
+```mermaid
+flowchart LR
+    A[Paperclip<br/>Задача CIT-N] --> B[run-agent.sh]
+    B --> C{Выбор агента}
+    C -->|"--agent ba"| BA[BA Agent]
+    C -->|"--agent sa"| SA[SA Agent]
+    C -->|"--agent tw"| TW[TW Agent]
+    C -->|"--agent cs"| CS[CS Agent]
+
+    BA --> D[Claude API<br/>Sonnet]
+    SA --> D
+    TW --> D
+    CS --> D
+
+    D --> E[artifact.md]
+    E --> F[Validation<br/>5 checks]
+    F -->|"FAIL<br/>retry ≤3"| D
+    F -->|"PASS"| G[PlantUML → SVG]
+    G --> H[git push<br/>branch review/CIT-N]
+    H --> I[gh pr create<br/>label: artifact]
+    I --> J{Ревью}
+    J -->|"/approve<br/>или PR approve"| K[Auto-merge<br/>→ main]
+    J -->|"/reject feedback<br/>или changes requested"| L[Close PR<br/>Re-run agent<br/>с --feedback]
+    K --> M[Paperclip<br/>status: published]
+    L --> B
+```
+
+## Жизненный цикл задачи
+
+```mermaid
+stateDiagram-v2
+    [*] --> created: Paperclip создаёт CIT-N
+
+    created --> in_progress: run-agent.sh запускается
+    in_progress --> validating: Claude генерирует артефакт
+    validating --> in_progress: FAIL (retry ≤3)
+    validating --> review: PASS → PR создан
+    review --> in_progress: /reject + feedback
+    review --> published: /approve → auto-merge
+    published --> [*]
+```
 
 ## Агенты
 
 | Агент | Роль | Артефакты | Зона |
 |-------|------|-----------|------|
-| **BA** | Business Analyst | User stories, AC, бизнес-сценарии | "Что нужно сделать?" |
-| **SA** | System Analyst | API specs, sequence diagrams, test cases | "Как реализовать?" |
+| **BA** | Business Analyst | User stories, AC (Given/When/Then), бизнес-сценарии | "Что нужно сделать?" |
+| **SA** | System Analyst | API specs, sequence diagrams (PlantUML), test cases | "Как реализовать?" |
 | **TW** | Technical Writer | API reference, how-to guides, changelog | "Как работает сейчас?" |
-| **CS** | Customer Support | Ответы клиентам, bug-тикеты | "Как использовать?" |
+| **CS** | Customer Support | Ответы клиентам, bug-тикеты, эскалации | "Как использовать?" |
 
 ## Быстрый старт
 
 ### Требования
-- bash 4+
-- curl, jq
+- bash 4+, curl, jq
 - `ANTHROPIC_API_KEY` в переменных окружения
+- `gh` CLI (для PR-операций)
+- `plantuml` + Java (для рендеринга диаграмм)
 
 ### Запуск агента
 
@@ -45,7 +147,7 @@
 # BA: создать user story
 ./pipeline/run-agent.sh \
   --agent ba \
-  --task "Создай user story: клиент хочет отменить запись через Mini App" \
+  --task "User story: клиент хочет отменить запись через Mini App" \
   --context docs/business-rules/booking-rules.md docs/business-rules/cancellation-rules.md
 
 # SA: спроектировать API
@@ -54,7 +156,7 @@
   --task "API спека для DELETE /api/v1/bookings/{id}" \
   --context docs/data/data-dictionary.md docs/integrations/telegram-bot.md
 
-# TW: написать guide (post-deploy mode)
+# TW: написать guide
 ./pipeline/run-agent.sh \
   --agent tw \
   --task "How-to guide: как подключить Telegram-уведомления" \
@@ -76,23 +178,19 @@
 | `--task` | да | Текст задачи |
 | `--context` | нет | Дополнительные .md файлы для контекста |
 | `--mode` | нет | Режим работы (для TW: `post-deploy`) |
+| `--feedback` | нет | Фидбэк ревьювера (при повторном запуске) |
 
 ### Результат
-- Артефакт сохраняется в `output/{agent}_{timestamp}.md`
-- Автоматическая валидация (4 проверки)
-- При провале — retry с feedback (до 3 попыток)
+
+1. Артефакт генерируется через Claude API (Sonnet)
+2. Автоматическая валидация (5 проверок)
+3. PlantUML диаграммы рендерятся в SVG
+4. Создаётся PR в ветку `review/CIT-N` с лейблом `artifact`
+5. Ревьювер проверяет и пишет `/approve` или `/reject <фидбэк>`
 
 ## Валидация
 
-```bash
-# Валидировать любой артефакт
-./validation/validate.sh path/to/artifact.md
-
-# Валидация + рекомендации для ревью
-./pipeline/validate-and-review.sh path/to/artifact.md
-```
-
-### 4 проверки
+5 автоматических проверок перед созданием PR:
 
 | Проверка | Скрипт | Что делает |
 |----------|--------|-----------|
@@ -100,77 +198,65 @@
 | Completeness | `completeness-check.sh` | Все обязательные поля шаблона заполнены |
 | Glossary | `glossary-check.sh` | Термины из glossary.md, нет запрещенных синонимов |
 | Consistency | `consistency-check.sh` | Нет конфликтов с business-rules |
+| Diagrams | `diagram-check.sh` | Flowchart/ER→Mermaid, Sequence/C4→PlantUML |
 
-## Структура
+## GitHub Actions
+
+### `/approve` — Artifact Approved
+```
+PR approve или комментарий /approve
+  → Auto-merge PR в main
+  → Paperclip: status = published
+```
+
+### `/reject <фидбэк>` — Artifact Rejected
+```
+PR changes_requested или комментарий /reject <текст>
+  → Close PR
+  → Re-run agent с --feedback
+  → Новый PR создаётся автоматически
+```
+
+## Структура проекта
 
 ```
 cita-agents/
-├── README.md
-├── recon-report.md              # Результат разведки кодовой базы
-│
 ├── agents/                       # Профили и промпты агентов
-│   ├── ba-agent/
-│   │   ├── profile.md
-│   │   └── system-prompt.md
-│   ├── sa-agent/
-│   │   ├── profile.md
-│   │   └── system-prompt.md
-│   ├── tw-agent/
-│   │   ├── profile.md
-│   │   └── system-prompt.md
-│   └── cs-agent/
-│       ├── profile.md
-│       └── system-prompt.md
+│   ├── ba-agent/                 # Business Analyst
+│   ├── sa-agent/                 # System Analyst
+│   ├── tw-agent/                 # Technical Writer
+│   └── cs-agent/                 # Customer Support
 │
 ├── docs/                         # Контекстная документация
-│   ├── context/                  # Общий контекст для всех агентов
-│   │   ├── glossary.md           # 26 терминов
-│   │   ├── constraints.md        # 11 ограничений (C-001..C-011)
-│   │   ├── decision-matrix.md    # Матрица решений 4 агентов
-│   │   └── tech-stack.md         # Стек технологий (ADR-light)
-│   │
-│   ├── business-rules/           # Бизнес-правила (из кода)
-│   │   ├── booking-rules.md      # BR-001..BR-012
-│   │   ├── scheduling-rules.md   # SR-001..SR-010
-│   │   ├── notification-rules.md # NR-001..NR-012
-│   │   └── cancellation-rules.md # CR-001..CR-011
-│   │
-│   ├── integrations/             # Внешние интеграции
-│   │   ├── telegram-bot.md       # Bot API: команды, callbacks, webhook
-│   │   ├── telegram-miniapp.md   # Mini App: initData, auth, SDK
-│   │   └── 2gis.md              # 2GIS Suggest API
-│   │
-│   ├── data/                     # Модель данных
-│   │   └── data-dictionary.md    # 10 сущностей, PII, ER-диаграмма
-│   │
+│   ├── context/                  # glossary, constraints, tech-stack
+│   ├── business-rules/           # BR-NNN, SR-NNN, NR-NNN, CR-NNN
+│   ├── integrations/             # Telegram Bot, Mini App, 2GIS
+│   ├── data/                     # Data dictionary, ER-диаграмма
 │   ├── templates/                # Шаблоны артефактов
-│   │   ├── user-story-template.md
-│   │   ├── api-spec-template.md
-│   │   ├── sequence-diagram-template.md
-│   │   ├── test-case-template.md
-│   │   ├── how-to-guide-template.md
-│   │   ├── api-reference-template.md
-│   │   └── bug-report-template.md
-│   │
-│   └── examples/                 # Эталонные примеры
-│       ├── example-user-story.md
-│       ├── example-api-spec.md
-│       └── example-how-to-guide.md
+│   ├── examples/                 # Эталонные примеры
+│   └── artifacts/                # Сгенерированные артефакты
+│       ├── user-stories/
+│       ├── api-specs/
+│       ├── how-to-guides/
+│       └── .images/              # Rendered PlantUML SVGs
 │
-├── validation/                   # Скрипты валидации
-│   ├── validate.sh               # Главный runner
-│   ├── constraints-check.sh
-│   ├── completeness-check.sh
-│   ├── glossary-check.sh
-│   └── consistency-check.sh
-│
-├── pipeline/                     # Оркестрация
-│   ├── run-agent.sh              # Запуск агента (Claude API + валидация + retry)
-│   └── validate-and-review.sh    # Валидация + рекомендации
-│
-└── output/                       # Результаты работы агентов
-    └── (генерируется автоматически)
+├── validation/                   # Скрипты валидации (5 checks)
+├── pipeline/                     # Оркестрация (run-agent.sh)
+├── .github/workflows/            # GitHub Actions (approve/reject/deploy)
+└── output/                       # Временные результаты
 ```
+
+## Стек
+
+| Компонент | Технология |
+|-----------|-----------|
+| AI Model | Claude Sonnet (Anthropic API) |
+| Orchestration | Bash (run-agent.sh) |
+| Task Management | [Paperclip](https://paperclip.co) |
+| Code Review | GitHub Pull Requests |
+| CI/CD | GitHub Actions |
+| Documentation | MkDocs Material + GitHub Pages |
+| Diagrams | Mermaid (flowchart, ER) + PlantUML (sequence, C4) |
 
 ## Контекст проекта
 
