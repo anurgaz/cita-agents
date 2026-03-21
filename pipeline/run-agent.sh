@@ -9,6 +9,10 @@ OUTPUT_DIR="$BASE_DIR/output"
 VALIDATE_SCRIPT="$BASE_DIR/validation/validate.sh"
 MAX_RETRIES=3
 
+# Paperclip DB
+CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
+DB_CMD="docker exec paperclip-db-1 psql -U paperclip -d paperclip -t -A"
+
 # ─── Parse arguments ────────────────────────────────────────────
 AGENT=""
 TASK=""
@@ -62,6 +66,7 @@ if [[ ! -f "$SYSTEM_PROMPT_FILE" ]]; then
     exit 1
 fi
 
+echo ""
 echo "═══════════════════════════════════════════"
 echo "  Agent: $AGENT"
 echo "  Task: ${TASK:0:80}..."
@@ -144,7 +149,6 @@ call_claude() {
     local user_message="$1"
     local response
 
-    # Build JSON payload using jq for proper escaping
     local payload
     payload=$(jq -n \
         --arg model "claude-sonnet-4-6" \
@@ -166,7 +170,6 @@ call_claude() {
         -H "anthropic-version: 2023-06-01" \
         -d "$payload")
 
-    # Extract text from response
     local text
     text=$(echo "$response" | jq -r '.content[0].text // empty')
 
@@ -178,6 +181,49 @@ call_claude() {
     fi
 
     echo "$text"
+}
+
+# ─── Detect artifact type → target directory ────────────────────
+detect_target_dir() {
+    local file="$1"
+    local content
+    content=$(cat "$file")
+
+    if echo "$content" | grep -qi "User Story\|US-[0-9]"; then
+        echo "docs/artifacts/user-stories"
+    elif echo "$content" | grep -qi "API Spec\|API спецификац\|endpoint.*method\|OpenAPI"; then
+        echo "docs/artifacts/api-specs"
+    elif echo "$content" | grep -qi "Test Case\|TC-[0-9]\|тест-кейс"; then
+        echo "docs/artifacts/test-cases"
+    elif echo "$content" | grep -qi "How-to\|How to\|Как подключить\|Как настроить\|Пошаговая"; then
+        echo "docs/artifacts/how-to-guides"
+    elif echo "$content" | grep -qi "API Reference\|эндпоинт.*описание"; then
+        echo "docs/artifacts/api-reference"
+    elif echo "$content" | grep -qi "Changelog\|CHANGELOG\|изменения.*версия"; then
+        echo "docs/artifacts/changelog"
+    elif echo "$content" | grep -qi "BUG\|Bug Report\|баг\|дефект"; then
+        echo "docs/artifacts/bug-reports"
+    else
+        # Default by agent
+        case "$AGENT" in
+            ba) echo "docs/artifacts/user-stories" ;;
+            sa) echo "docs/artifacts/api-specs" ;;
+            tw) echo "docs/artifacts/how-to-guides" ;;
+            cs) echo "docs/artifacts/bug-reports" ;;
+            *)  echo "docs/artifacts" ;;
+        esac
+    fi
+}
+
+# ─── Generate filename from task ────────────────────────────────
+make_filename() {
+    local task="$1"
+    echo "$task" | \
+        sed 's/[^a-zA-Zа-яА-ЯёЁ0-9 ]//g' | \
+        tr '[:upper:]' '[:lower:]' | \
+        tr ' ' '-' | \
+        sed 's/--*/-/g; s/^-//; s/-$//' | \
+        cut -c1-60
 }
 
 # ─── Main loop with retry ───────────────────────────────────────
@@ -192,7 +238,6 @@ while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
     echo ""
     echo "--- Attempt $ATTEMPT/$MAX_RETRIES ---"
 
-    # Call Claude
     echo "  Calling Claude API..."
     RESULT=$(call_claude "$USER_MESSAGE")
 
@@ -202,65 +247,101 @@ while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
         continue
     fi
 
-    # Save result
     echo "$RESULT" > "$OUTPUT_FILE"
     echo "  Saved to: $OUTPUT_FILE"
 
-    # Validate
     echo "  Running validation..."
     VALIDATION_OUTPUT=""
     if VALIDATION_OUTPUT=$("$VALIDATE_SCRIPT" "$OUTPUT_FILE" 2>&1); then
         echo ""
-        echo "  Validation PASSED. Creating Paperclip issue..."
+        echo "  Validation PASSED. Creating PR..."
 
-        # Create issue in Paperclip (cita.kz company)
-        CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
-        DB_CMD="docker exec paperclip-db-1 psql -U paperclip -d paperclip -t -A"
         AGENT_UPPER=$(echo "$AGENT" | tr "[:lower:]" "[:upper:]")
 
-        # Get next issue number
+        # ─── Get next issue number from Paperclip ────────────
         ISSUE_NUM=$($DB_CMD -c "SELECT COALESCE(MAX(issue_number),0)+1 FROM issues WHERE company_id='$CITA_COMPANY_ID';" 2>/dev/null || echo "1")
 
-        # Build title
-        ISSUE_TITLE="[$AGENT_UPPER] ${TASK:0:80}"
+        # ─── Detect target directory ─────────────────────────
+        TARGET_DIR=$(detect_target_dir "$OUTPUT_FILE")
+        FILENAME=$(make_filename "$TASK").md
+        TARGET_PATH="${TARGET_DIR}/${FILENAME}"
 
-        # Escape content for SQL
-        ARTIFACT_CONTENT=$(cat "$OUTPUT_FILE" | sed "s/'/''/g")
-        VALIDATION_LOG=$(echo "$VALIDATION_OUTPUT" | sed "s/'/''/g" | head -30)
+        # ─── Create branch and PR ────────────────────────────
+        BRANCH="review/CIT-${ISSUE_NUM}"
 
-        ISSUE_DESC="## Задача
+        cd "$BASE_DIR"
+        git checkout main >/dev/null 2>&1
+        git pull origin main >/dev/null 2>&1
+        git checkout -b "$BRANCH" >/dev/null 2>&1
+
+        mkdir -p "$BASE_DIR/$TARGET_DIR"
+        cp "$OUTPUT_FILE" "$BASE_DIR/$TARGET_PATH"
+        git add "$TARGET_PATH"
+        git commit -m "artifact(CIT-${ISSUE_NUM}): [${AGENT_UPPER}] ${TASK:0:60}" >/dev/null 2>&1
+        git push origin "$BRANCH" >/dev/null 2>&1
+
+        # Create PR via gh CLI
+        PR_BODY="## Артефакт от ${AGENT_UPPER} Agent
+
+**Тикет:** CIT-${ISSUE_NUM}
+**Статус валидации:** PASSED (5/5)
+**Файл:** \`${TARGET_PATH}\`
+
+### Задача
 ${TASK}
 
-## Артефакт
-${ARTIFACT_CONTENT}
+### Отчёт валидации
+\`\`\`
+${VALIDATION_OUTPUT}
+\`\`\`
 
-## Отчёт валидации
-${VALIDATION_LOG}
+---
+**Для ревью:** откройте файл \`${TARGET_PATH}\` в разделе Files changed.
+**Approve** → merge в main → автодеплой в GitHub Pages.
+**Request changes** → агент переделает с учётом комментариев."
 
-PASSED (all checks)"
+        PR_URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "CIT-${ISSUE_NUM}: [${AGENT_UPPER}] ${TASK:0:80}" \
+            --body "$PR_BODY" \
+            2>/dev/null) || PR_URL="FAILED"
 
+        git checkout main >/dev/null 2>&1
+
+        # ─── Create Paperclip issue with PR link ─────────────
+        ISSUE_TITLE="[${AGENT_UPPER}] ${TASK:0:80}"
+        ESCAPED_TITLE=$(echo "$ISSUE_TITLE" | sed "s/'/''/g")
+
+        ISSUE_DESC="## CIT-${ISSUE_NUM}: [${AGENT_UPPER}] ${TASK:0:80}
+
+**Статус:** pending_review
+**Pull Request:** ${PR_URL}
+**Валидация:** PASSED (5/5)
+**Файл:** ${TARGET_PATH}
+
+Ревью артефакта в GitHub PR: ${PR_URL}"
         ESCAPED_DESC=$(echo "$ISSUE_DESC" | sed "s/'/''/g")
 
-        # Find agent ID in Paperclip
         AGENT_ID=$($DB_CMD -c "SELECT id FROM agents WHERE company_id='$CITA_COMPANY_ID' AND name ILIKE '${AGENT}%' LIMIT 1;" 2>/dev/null || echo "")
 
-        ISSUE_ID=$($DB_CMD -c "INSERT INTO issues (id, company_id, title, description, status, priority, issue_number, identifier, created_by_agent_id, created_at, updated_at) VALUES (gen_random_uuid(), '$CITA_COMPANY_ID', '$ISSUE_TITLE', '$ESCAPED_DESC', 'pending_review', 'medium', $ISSUE_NUM, 'CIT-$ISSUE_NUM', $([ -n "$AGENT_ID" ] && echo "'$AGENT_ID'" || echo NULL), now(), now()) RETURNING id;" 2>/dev/null || echo "FAILED")
+        ISSUE_ID=$($DB_CMD -c "INSERT INTO issues (id, company_id, title, description, status, priority, issue_number, identifier, created_by_agent_id, created_at, updated_at) VALUES (gen_random_uuid(), '$CITA_COMPANY_ID', '$ESCAPED_TITLE', '$ESCAPED_DESC', 'pending_review', 'medium', $ISSUE_NUM, 'CIT-$ISSUE_NUM', $([ -n "$AGENT_ID" ] && echo "'$AGENT_ID'" || echo NULL), now(), now()) RETURNING id;" 2>/dev/null || echo "FAILED")
 
-        if [[ "$ISSUE_ID" != "FAILED" && -n "$ISSUE_ID" ]]; then
-            echo ""
-            echo "═══════════════════════════════════════════"
-            echo "  PASSED - Sent to Paperclip for review"
-            echo "  Output: $OUTPUT_FILE"
-            echo "  Paperclip: CIT-$ISSUE_NUM (id: $ISSUE_ID)"
-            echo "═══════════════════════════════════════════"
+        echo ""
+        echo "═══════════════════════════════════════════"
+        if [[ "$PR_URL" != "FAILED" && "$PR_URL" == http* ]]; then
+            echo "  PASSED - Pull Request created"
+            echo "  PR: $PR_URL"
+            echo "  Paperclip: CIT-$ISSUE_NUM"
+            echo "  File: $TARGET_PATH"
+            echo "  Review the artifact in GitHub PR"
         else
-            echo ""
-            echo "═══════════════════════════════════════════"
-            echo "  PASSED - Ready for review"
-            echo "  Output: $OUTPUT_FILE"
-            echo "  (Paperclip issue creation failed - review manually)"
-            echo "═══════════════════════════════════════════"
+            echo "  PASSED - Branch pushed (PR creation failed)"
+            echo "  Branch: $BRANCH"
+            echo "  Paperclip: CIT-$ISSUE_NUM"
+            echo "  Create PR manually: gh pr create --base main --head $BRANCH"
         fi
+        echo "═══════════════════════════════════════════"
         exit 0
     else
         echo "  Validation FAILED"
