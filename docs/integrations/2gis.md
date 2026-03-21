@@ -83,20 +83,30 @@ GET https://catalog.api.2gis.com/3.0/suggests
 
 ## Архитектура
 
-```
-Frontend (React)
-    |
-    | GET /api/v1/location/cities?q=...
-    | GET /api/v1/location/addresses?q=...&lat=...&lon=...
-    v
-Backend (FastAPI proxy)
-    |
-    | GET https://catalog.api.2gis.com/3.0/suggests?key=...
-    v
-2GIS Suggest API
-    |
-    v
-Backend -> map to [{name, full_name, point}] -> Frontend
+```kroki-plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
+
+participant "Frontend\n(React)" as fe
+participant "Backend\n(FastAPI proxy)" as be
+participant "2GIS API\n(Suggest API)" as gis
+
+fe -> be : GET /api/v1/location/cities?q=...\nGET /api/v1/location/addresses?q=...
+activate be
+
+be -> gis : GET https://catalog.api.2gis.com/3.0/suggests?key=...
+activate gis
+gis --> be : 200 OK (2gis response)
+deactivate gis
+
+be -> be : map to [{name, full_name, point}]
+be --> fe : 200 OK (mapped array)
+deactivate be
+@enduml
 ```
 
 ## Использование в UI

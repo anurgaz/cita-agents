@@ -4,15 +4,34 @@
 
 ## Архитектура
 
-```
-         ДО РАЗРАБОТКИ                    ПОСЛЕ ДЕПЛОЯ
-  ┌──────────┐    ┌──────────┐           ┌──────────┐    ┌──────────┐
-  │ BA Agent │───>│ SA Agent │──> Dev ──>│ TW Agent │───>│ CS Agent │
-  │ (что?)   │    │ (как?)   │   Code    │ (docs)   │    │ (support)│
-  └──────────┘    └──────────┘           └──────────┘    └──────────┘
-   User Story      API Spec              API Reference    Ответы
-   AC (G/W/T)      Sequence Diag         How-to Guides    Bug-тикеты
-   Бизнес-правила  Test Cases            Changelog        Эскалации
+```kroki-plantuml
+@startuml
+skinparam backgroundColor transparent
+skinparam shadowing false
+skinparam defaultFontName Inter
+skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
+skinparam NoteBackgroundColor transparent
+skinparam NoteBorderColor transparent
+
+package "ДО РАЗРАБОТКИ" {
+    rectangle "BA Agent\n(что?)" as BA #B2F5EA
+    rectangle "SA Agent\n(как?)" as SA #81E6D9
+}
+
+rectangle "Dev Code" as DEV #FED7D7
+
+package "ПОСЛЕ ДЕПЛОЯ" {
+    rectangle "TW Agent\n(docs)" as TW #81E6D9
+    rectangle "CS Agent\n(support)" as CS #B2F5EA
+}
+
+BA -> SA : User Story\nAC (G/W/T)\nБизнес-правила
+SA -> DEV : API Spec\nSequence Diag\nTest Cases
+DEV -> TW : 
+TW -> CS : API Reference\nHow-to Guides\nChangelog\nОтветы\nBug-тикеты\nЭскалации
+
+@enduml
 ```
 
 **Поток работы:**
