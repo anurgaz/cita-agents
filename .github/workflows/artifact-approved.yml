@@ -1,0 +1,36 @@
+name: Artifact Approved
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  publish:
+    if: >
+      github.event.review.state == 'approved' &&
+      contains(github.event.pull_request.labels.*.name, 'artifact')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auto-merge PR
+        run: gh pr merge ${{ github.event.pull_request.number }} --merge --delete-branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract CIT number
+        id: cit
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          CIT_NUM=$(echo "$TITLE" | grep -oP 'CIT-\K[0-9]+')
+          echo "number=$CIT_NUM" >> $GITHUB_OUTPUT
+
+      - name: Update Paperclip status
+        uses: appleboy/ssh-action@v1
+        with:
+          host: 159.69.28.60
+          username: root
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
+            docker exec paperclip-db-1 psql -U paperclip -d paperclip -c               "UPDATE issues SET status = 'published', completed_at = now(), updated_at = now() WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.cit.outputs.number }};"

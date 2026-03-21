@@ -18,6 +18,7 @@ AGENT=""
 TASK=""
 CONTEXT_FILES=()
 MODE=""
+FEEDBACK=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -38,6 +39,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --mode)
             MODE="$2"
+            shift 2
+            ;;
+        --feedback)
+            FEEDBACK="$2"
             shift 2
             ;;
         *)
@@ -323,11 +328,22 @@ PYEOF
 }
 
 # ─── Main loop with retry ───────────────────────────────────────
+FEEDBACK_BLOCK=""
+if [[ -n "$FEEDBACK" ]]; then
+    FEEDBACK_BLOCK="
+
+ФИДБЭК ОТ РЕВЬЮВЕРА (учти при генерации):
+${FEEDBACK}
+
+Исправь артефакт с учётом этого фидбэка. Не меняй то что не просили менять."
+fi
+
 USER_MESSAGE="КОНТЕКСТ:
 $CONTEXT_BLOCK
 
 ЗАДАЧА:
-$TASK"
+$TASK
+$FEEDBACK_BLOCK"
 
 ATTEMPT=1
 while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
