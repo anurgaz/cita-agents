@@ -16,15 +16,15 @@ skinparam NoteBackgroundColor transparent
 skinparam NoteBorderColor transparent
 
 package "ДО РАЗРАБОТКИ" {
-    rectangle "BA Agent\n(что?)" as BA #B2F5EA
-    rectangle "SA Agent\n(как?)" as SA #81E6D9
+    rectangle "BA Agent\n(что?)" as BA #2C7A7B
+    rectangle "SA Agent\n(как?)" as SA #319795
 }
 
-rectangle "Dev Code" as DEV #FED7D7
+rectangle "Dev Code" as DEV #9B2C2C
 
 package "ПОСЛЕ ДЕПЛОЯ" {
-    rectangle "TW Agent\n(docs)" as TW #81E6D9
-    rectangle "CS Agent\n(support)" as CS #B2F5EA
+    rectangle "TW Agent\n(docs)" as TW #319795
+    rectangle "CS Agent\n(support)" as CS #2C7A7B
 }
 
 BA -> SA : User Story\nAC (G/W/T)\nБизнес-правила

@@ -255,7 +255,7 @@ skinparam backgroundColor #1e293b
 skinparam shadowing false
 skinparam defaultFontName Inter
 skinparam defaultFontColor #f8fafc
-skinparam EntityBackgroundColor #F7FAFC
+skinparam EntityBackgroundColor #2D3748
 skinparam EntityBorderColor #2c7a7b
 skinparam ArrowColor #2c7a7b
 

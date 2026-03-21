@@ -92,13 +92,13 @@ skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 
-rectangle "PO / Stakeholder" as PO #E6FFFA
-rectangle "BA Agent" as BA #B2F5EA
-rectangle "SA Agent" as SA #81E6D9
-rectangle "Разработка + Деплой\n(человек)" as DEV #FED7D7
-rectangle "TW Agent" as TW #81E6D9
-rectangle "CS Agent" as CS #B2F5EA
-rectangle "Tech Lead" as TL #FED7D7
+rectangle "PO / Stakeholder" as PO #234E52
+rectangle "BA Agent" as BA #2C7A7B
+rectangle "SA Agent" as SA #319795
+rectangle "Разработка + Деплой\n(человек)" as DEV #9B2C2C
+rectangle "TW Agent" as TW #319795
+rectangle "CS Agent" as CS #2C7A7B
+rectangle "Tech Lead" as TL #9B2C2C
 
 PO -down-> BA : задача
 BA -down-> SA : user story +\nacceptance criteria

@@ -69,13 +69,13 @@ skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 
-rectangle "Деплой в main" as code #E2E8F0
-rectangle "TW Agent" as tw #81E6D9
-rectangle "API Reference" as api #E6FFFA
-rectangle "How-to Guides" as guides #E6FFFA
-rectangle "as-is docs" as docs #E6FFFA
-rectangle "CS Agent" as cs #B2F5EA
-rectangle "SA Agent" as sa #81E6D9
+rectangle "Деплой в main" as code #4A5568
+rectangle "TW Agent" as tw #319795
+rectangle "API Reference" as api #234E52
+rectangle "How-to Guides" as guides #234E52
+rectangle "as-is docs" as docs #234E52
+rectangle "CS Agent" as cs #2C7A7B
+rectangle "SA Agent" as sa #319795
 
 code -> tw : Триггер
 tw -> api : Создает

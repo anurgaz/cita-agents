@@ -45,12 +45,12 @@ skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 
 actor "Пользователь" as po
-rectangle "BA Agent" as ba #B2F5EA
-rectangle "User Story" as us #E6FFFA
-rectangle "SA Agent" as sa #81E6D9
-rectangle "API Spec + Tests" as api #E6FFFA
-rectangle "TW Agent" as tw #81E6D9
-rectangle "Documentation" as docs #E6FFFA
+rectangle "BA Agent" as ba #2C7A7B
+rectangle "User Story" as us #234E52
+rectangle "SA Agent" as sa #319795
+rectangle "API Spec + Tests" as api #234E52
+rectangle "TW Agent" as tw #319795
+rectangle "Documentation" as docs #234E52
 
 po -> ba : Требования
 ba -> us : Создает

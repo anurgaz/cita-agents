@@ -55,11 +55,11 @@ skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 
 actor "Клиент" as client
-rectangle "CS Agent" as cs #B2F5EA
-rectangle "TW Agent\n(How-to Guides)" as tw #81E6D9
+rectangle "CS Agent" as cs #2C7A7B
+rectangle "TW Agent\n(How-to Guides)" as tw #319795
 actor "Разработчик" as dev
 actor "PO" as po
-rectangle "BA Agent" as ba #B2F5EA
+rectangle "BA Agent" as ba #2C7A7B
 
 client -> cs : Вопрос / Проблема
 tw -> cs : База знаний

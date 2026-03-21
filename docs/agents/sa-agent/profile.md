@@ -46,13 +46,13 @@ skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
 skinparam RectangleBorderColor #2c7a7b
 
-rectangle "BA Agent" as ba #B2F5EA
-rectangle "User Story" as us #E6FFFA
-rectangle "SA Agent" as sa #81E6D9
-rectangle "TW Agent /\nas-is docs" as tw #81E6D9
-rectangle "API Spec" as api #E6FFFA
-rectangle "Sequence Diagram" as seq #E6FFFA
-rectangle "Test Cases" as tc #E6FFFA
+rectangle "BA Agent" as ba #2C7A7B
+rectangle "User Story" as us #234E52
+rectangle "SA Agent" as sa #319795
+rectangle "TW Agent /\nas-is docs" as tw #319795
+rectangle "API Spec" as api #234E52
+rectangle "Sequence Diagram" as seq #234E52
+rectangle "Test Cases" as tc #234E52
 actor "Разработчик" as dev
 actor "Code Review" as cr
 actor "QA" as qa
