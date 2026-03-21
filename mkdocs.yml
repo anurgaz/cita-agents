@@ -1,6 +1,7 @@
 site_name: "cita.kz - AI Agents Documentation"
 site_url: https://anurgaz.github.io/cita-agents/
-docs_dir: .
+site_dir: site
+
 theme:
   name: material
   language: ru
@@ -15,29 +16,29 @@ theme:
 nav:
   - Главная: index.md
   - Контекст:
-    - Глоссарий: docs/context/glossary.md
-    - Ограничения: docs/context/constraints.md
-    - Матрица решений: docs/context/decision-matrix.md
-    - Стек: docs/context/tech-stack.md
+    - Глоссарий: context/glossary.md
+    - Ограничения: context/constraints.md
+    - Матрица решений: context/decision-matrix.md
+    - Стек: context/tech-stack.md
   - Бизнес-правила:
-    - Бронирование: docs/business-rules/booking-rules.md
-    - Расписание: docs/business-rules/scheduling-rules.md
-    - Уведомления: docs/business-rules/notification-rules.md
-    - Отмены: docs/business-rules/cancellation-rules.md
+    - Бронирование: business-rules/booking-rules.md
+    - Расписание: business-rules/scheduling-rules.md
+    - Уведомления: business-rules/notification-rules.md
+    - Отмены: business-rules/cancellation-rules.md
   - Интеграции:
-    - Telegram Bot: docs/integrations/telegram-bot.md
-    - Telegram Mini App: docs/integrations/telegram-miniapp.md
-    - 2GIS: docs/integrations/2gis.md
+    - Telegram Bot: integrations/telegram-bot.md
+    - Telegram Mini App: integrations/telegram-miniapp.md
+    - 2GIS: integrations/2gis.md
   - Данные:
-    - Словарь данных: docs/data/data-dictionary.md
+    - Словарь данных: data/data-dictionary.md
   - Артефакты:
-    - User Stories: docs/artifacts/user-stories/index.md
-    - API Спеки: docs/artifacts/api-specs/index.md
-    - Тест-кейсы: docs/artifacts/test-cases/index.md
-    - How-to Guides: docs/artifacts/how-to-guides/index.md
-    - API Reference: docs/artifacts/api-reference/index.md
-    - Changelog: docs/artifacts/changelog/index.md
-    - Bug Reports: docs/artifacts/bug-reports/index.md
+    - User Stories: artifacts/user-stories/index.md
+    - API Спеки: artifacts/api-specs/index.md
+    - Тест-кейсы: artifacts/test-cases/index.md
+    - How-to Guides: artifacts/how-to-guides/index.md
+    - API Reference: artifacts/api-reference/index.md
+    - Changelog: artifacts/changelog/index.md
+    - Bug Reports: artifacts/bug-reports/index.md
   - Агенты:
     - BA Agent: agents/ba-agent/profile.md
     - SA Agent: agents/sa-agent/profile.md
