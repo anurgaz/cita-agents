@@ -58,7 +58,7 @@ jobs:
         with:
           host: 159.69.28.60
           username: root
-          password: ${{ secrets.VPS_PASSWORD }}
+          key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
             docker exec paperclip-db-1 psql -U paperclip -d paperclip -c \

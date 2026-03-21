@@ -65,7 +65,7 @@ jobs:
         with:
           host: 159.69.28.60
           username: root
-          password: ${{ secrets.VPS_PASSWORD }}
+          key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /root/cita-agents
             export ANTHROPIC_API_KEY=$(cat /root/.anthropic_key)
