@@ -36,6 +36,9 @@ jobs:
       - name: Install dependencies
         run: pip install mkdocs mkdocs-material
 
+      - name: Generate artifact indexes
+        run: bash pipeline/generate-indexes.sh docs/artifacts
+
       - name: Build docs
         run: mkdocs build
 

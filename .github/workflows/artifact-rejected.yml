@@ -78,11 +78,14 @@ jobs:
           command_timeout: 30m
           script: |
             cd /root/cita-agents
+            git checkout main
+            git pull origin main
+
             export ANTHROPIC_API_KEY=$(cat /root/.anthropic_key)
+            export PAPERCLIP_ISSUE_NUMBER=${{ steps.info.outputs.cit_number }}
 
             CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
-            docker exec paperclip-db-1 psql -U paperclip -d paperclip -c \
-              "UPDATE issues SET status = 'in_progress', updated_at = now() WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};" 2>/dev/null || true
+            docker exec paperclip-db-1 psql -U paperclip -d paperclip -c               "UPDATE issues SET status = 'in_progress', updated_at = now() WHERE company_id = '$CITA_COMPANY_ID' AND issue_number = ${{ steps.info.outputs.cit_number }};" 2>/dev/null || true
 
             ./pipeline/run-agent.sh \
               --agent ${{ steps.info.outputs.agent }} \
