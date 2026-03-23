@@ -205,39 +205,45 @@ cita-agents/
 
 ```plantuml
 @startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
-
 skinparam backgroundColor #1e293b
 skinparam shadowing false
 skinparam defaultFontName Inter
 skinparam defaultFontColor #f8fafc
 skinparam ArrowColor #2c7a7b
+skinparam RectangleBorderColor #2c7a7b
+skinparam DatabaseBorderColor #2c7a7b
+skinparam ActorBorderColor #2c7a7b
+skinparam PackageBorderColor #2c7a7b
 
-Person(client, "Клиент", "Записывается на услуги")
-Person(provider, "Провайдер", "Управляет расписанием")
+actor "Клиент" as client #2C7A7B
+actor "Провайдер" as provider #2C7A7B
 
-System_Boundary(cita, "Cita.kz") {
-    Container(miniapp, "Telegram Mini App", "Next.js, React", "UI для клиентов")
-    Container(webview, "Web UI", "React", "Админка и лендинг")
-    Container(bot, "Telegram Bot", "Python", "Уведомления и быстрые действия")
-    Container(backend, "API Backend", "FastAPI, Python", "Бизнес-логика")
-    ContainerDb(db, "Database", "PostgreSQL", "Хранение данных")
+package "Cita.kz" {
+    rectangle "Telegram Mini App
+<size:10>Next.js, React</size>" as miniapp #319795
+    rectangle "Web UI
+<size:10>React</size>" as webview #319795
+    rectangle "Telegram Bot
+<size:10>Python</size>" as bot #319795
+    rectangle "API Backend
+<size:10>FastAPI, Python</size>" as backend #2C7A7B
+    database "PostgreSQL" as db #2C7A7B
 }
 
-System_Ext(tg, "Telegram API", "Мессенджер")
-System_Ext(gis, "2GIS API", "Геокодинг")
+rectangle "Telegram API" as tg #4A5568
+rectangle "2GIS API" as gis #4A5568
 
-Rel(client, miniapp, "Использует", "HTTPS")
-Rel(client, bot, "Получает уведомления", "Telegram")
-Rel(provider, webview, "Управляет салоном", "HTTPS")
-Rel(provider, bot, "Управляет записями", "Telegram")
+client --> miniapp : HTTPS
+client --> bot : Telegram
+provider --> webview : HTTPS
+provider --> bot : Telegram
 
-Rel(miniapp, backend, "API вызовы", "JSON/HTTPS")
-Rel(webview, backend, "API вызовы", "JSON/HTTPS")
-Rel(bot, backend, "Webhooks", "JSON/HTTPS")
-Rel(backend, db, "Чтение/Запись", "SQL/TCP")
+miniapp --> backend : JSON/HTTPS
+webview --> backend : JSON/HTTPS
+bot --> backend : Webhooks
 
-Rel(backend, tg, "Отправка сообщений", "JSON/HTTPS")
-Rel(backend, gis, "Поиск адресов", "JSON/HTTPS")
+backend --> db : SQL/TCP
+backend --> tg : Сообщения
+backend --> gis : Геокодинг
 @enduml
 ```
