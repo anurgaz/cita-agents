@@ -249,7 +249,7 @@ rejected   cancelled
 
 ## ER-диаграмма (упрощенная)
 
-```kroki-plantuml
+```plantuml
 @startuml
 skinparam backgroundColor #1e293b
 skinparam shadowing false

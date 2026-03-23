@@ -83,7 +83,7 @@ GET https://catalog.api.2gis.com/3.0/suggests
 
 ## Архитектура
 
-```kroki-plantuml
+```plantuml
 @startuml
 skinparam backgroundColor #1e293b
 skinparam shadowing false

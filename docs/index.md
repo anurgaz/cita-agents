@@ -4,7 +4,7 @@
 
 ## Архитектура
 
-```kroki-plantuml
+```plantuml
 @startuml
 skinparam backgroundColor #1e293b
 skinparam shadowing false
@@ -27,7 +27,7 @@ package "ПОСЛЕ ДЕПЛОЯ" {
 
 BA -> SA : User Story\nAC (G/W/T)\nБизнес-правила
 SA -> DEV : API Spec\nSequence Diag\nTest Cases
-DEV -> TW : 
+DEV -> TW : git diff\n(после деплоя)
 TW -> CS : API Reference\nHow-to Guides\nChangelog\nОтветы\nBug-тикеты\nЭскалации
 
 @enduml
@@ -203,7 +203,7 @@ cita-agents/
 
 ## C4 Архитектура
 
-```kroki-plantuml
+```plantuml
 @startuml
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 
