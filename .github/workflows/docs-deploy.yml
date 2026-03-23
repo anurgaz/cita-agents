@@ -31,7 +31,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y plantuml default-jre
-          pip install plantuml-markdown
 
       - name: Install dependencies
         run: pip install mkdocs mkdocs-material
@@ -40,7 +39,9 @@ jobs:
         run: bash pipeline/generate-indexes.sh docs/artifacts
 
       - name: Build docs
-        run: mkdocs build
+        run: |
+          export PYTHONPATH="$PWD:$PYTHONPATH"
+          mkdocs build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

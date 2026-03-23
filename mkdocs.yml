@@ -58,10 +58,8 @@ markdown_extensions:
           class: mermaid
           format: !!python/name:pymdownx.superfences.fence_code_format
         - name: plantuml
-          class: uml
-          format: !!python/name:plantuml_markdown.fenced_plantuml_format
-  - plantuml_markdown:
-      format: svg
+          class: plantuml
+          format: !!python/name:plantuml_render.fenced_plantuml_format
 
 extra_javascript:
   - https://unpkg.com/mermaid@10/dist/mermaid.min.js
