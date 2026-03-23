@@ -219,14 +219,10 @@ actor "Клиент" as client #2C7A7B
 actor "Провайдер" as provider #2C7A7B
 
 package "Cita.kz" {
-    rectangle "Telegram Mini App
-<size:10>Next.js, React</size>" as miniapp #319795
-    rectangle "Web UI
-<size:10>React</size>" as webview #319795
-    rectangle "Telegram Bot
-<size:10>Python</size>" as bot #319795
-    rectangle "API Backend
-<size:10>FastAPI, Python</size>" as backend #2C7A7B
+    rectangle "Telegram Mini App\n(Next.js)" as miniapp #319795
+    rectangle "Web UI\n(React)" as webview #319795
+    rectangle "Telegram Bot\n(Python)" as bot #319795
+    rectangle "API Backend\n(FastAPI)" as backend #2C7A7B
     database "PostgreSQL" as db #2C7A7B
 }
 
@@ -243,7 +239,7 @@ webview --> backend : JSON/HTTPS
 bot --> backend : Webhooks
 
 backend --> db : SQL/TCP
-backend --> tg : Сообщения
-backend --> gis : Геокодинг
+backend --> tg
+backend --> gis
 @enduml
 ```
