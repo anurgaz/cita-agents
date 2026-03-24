@@ -68,16 +68,6 @@ if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     exit 1
 fi
 
-# Resolve Paperclip agent ID for cost tracking
-PAPERCLIP_AGENT_ID=$($DB_CMD -c "SELECT id FROM agents WHERE company_id='$CITA_COMPANY_ID' AND name ILIKE '${AGENT}%' LIMIT 1;" 2>/dev/null || echo "")
-PAPERCLIP_AGENT_ID=$(echo "$PAPERCLIP_AGENT_ID" | tr -d ' ')
-
-# Budget check
-if [[ -n "$PAPERCLIP_AGENT_ID" ]]; then
-    if ! check_budget "$PAPERCLIP_AGENT_ID"; then
-        exit 1
-    fi
-fi
 
 # ─── Resolve agent ───────────────────────────────────────────────
 AGENT_DIR="$BASE_DIR/agents/${AGENT}-agent"
@@ -204,21 +194,6 @@ call_claude() {
         echo "API Error: $error" >&2
         return 1
     fi
-
-    # Extract and accumulate token usage
-    local in_tok out_tok cost_in cost_out cost_cents
-    in_tok=$(echo "$response" | jq -r '.usage.input_tokens // 0')
-    out_tok=$(echo "$response" | jq -r '.usage.output_tokens // 0')
-    # Claude Sonnet 4: $3/1M input, $15/1M output -> in cents: 0.0003/1K in, 0.0015/1K out
-    cost_in=$(echo "scale=4; $in_tok * 0.3 / 1000" | bc)
-    cost_out=$(echo "scale=4; $out_tok * 1.5 / 1000" | bc)
-    cost_cents=$(echo "scale=0; ($cost_in + $cost_out + 0.5) / 1" | bc)
-
-    TOTAL_INPUT_TOKENS=$((TOTAL_INPUT_TOKENS + in_tok))
-    TOTAL_OUTPUT_TOKENS=$((TOTAL_OUTPUT_TOKENS + out_tok))
-    TOTAL_COST_CENTS=$((TOTAL_COST_CENTS + cost_cents))
-
-    echo "  Tokens: ${in_tok} in / ${out_tok} out (~${cost_cents}¢)" >&2
 
     echo "$text"
 }
@@ -408,6 +383,37 @@ PYEOF
 }
 
 # ─── Main loop with retry ───────────────────────────────────────
+
+# Accumulate tokens from last API response
+accumulate_tokens() {
+    local resp_file="$OUTPUT_DIR/.last_response.json"
+    if [[ ! -f "$resp_file" ]]; then return; fi
+
+    local in_tok out_tok cost_in cost_out cost_cents
+    in_tok=$(jq -r '.usage.input_tokens // 0' "$resp_file")
+    out_tok=$(jq -r '.usage.output_tokens // 0' "$resp_file")
+    # Claude Sonnet 4: $3/1M input, $15/1M output -> in cents
+    cost_in=$(echo "scale=4; $in_tok * 0.3 / 1000" | bc)
+    cost_out=$(echo "scale=4; $out_tok * 1.5 / 1000" | bc)
+    cost_cents=$(echo "scale=0; ($cost_in + $cost_out + 0.5) / 1" | bc)
+
+    TOTAL_INPUT_TOKENS=$((TOTAL_INPUT_TOKENS + in_tok))
+    TOTAL_OUTPUT_TOKENS=$((TOTAL_OUTPUT_TOKENS + out_tok))
+    TOTAL_COST_CENTS=$((TOTAL_COST_CENTS + cost_cents))
+
+    echo "  Tokens: ${in_tok} in / ${out_tok} out (~${cost_cents}¢)"
+}
+# Resolve Paperclip agent ID for cost tracking
+PAPERCLIP_AGENT_ID=$($DB_CMD -c "SELECT id FROM agents WHERE company_id='$CITA_COMPANY_ID' AND name ILIKE '${AGENT}%' LIMIT 1;" 2>/dev/null || echo "")
+PAPERCLIP_AGENT_ID=$(echo "$PAPERCLIP_AGENT_ID" | tr -d ' ')
+
+# Budget check
+if [[ -n "$PAPERCLIP_AGENT_ID" ]]; then
+    if ! check_budget "$PAPERCLIP_AGENT_ID"; then
+        exit 1
+    fi
+fi
+
 FEEDBACK_BLOCK=""
 if [[ -n "$FEEDBACK" ]]; then
     FEEDBACK_BLOCK="
@@ -432,6 +438,7 @@ while [[ $ATTEMPT -le $MAX_RETRIES ]]; do
 
     echo "  Calling Claude API..."
     RESULT=$(call_claude "$USER_MESSAGE")
+    accumulate_tokens
 
     if [[ $? -ne 0 || -z "$RESULT" ]]; then
         echo "  ERROR: API call failed"
