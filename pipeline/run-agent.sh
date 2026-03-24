@@ -13,6 +13,12 @@ MAX_RETRIES=3
 CITA_COMPANY_ID="ed133e66-a694-470e-8e94-4ea412647ce5"
 DB_CMD="docker exec paperclip-db-1 psql -U paperclip -d paperclip -t -A"
 
+# Cost tracking
+TOTAL_INPUT_TOKENS=0
+TOTAL_OUTPUT_TOKENS=0
+TOTAL_COST_CENTS=0
+CLAUDE_MODEL="claude-sonnet-4-6"
+
 # ─── Parse arguments ────────────────────────────────────────────
 AGENT=""
 TASK=""
@@ -60,6 +66,17 @@ fi
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     echo "ERROR: ANTHROPIC_API_KEY environment variable is not set"
     exit 1
+fi
+
+# Resolve Paperclip agent ID for cost tracking
+PAPERCLIP_AGENT_ID=$($DB_CMD -c "SELECT id FROM agents WHERE company_id='$CITA_COMPANY_ID' AND name ILIKE '${AGENT}%' LIMIT 1;" 2>/dev/null || echo "")
+PAPERCLIP_AGENT_ID=$(echo "$PAPERCLIP_AGENT_ID" | tr -d ' ')
+
+# Budget check
+if [[ -n "$PAPERCLIP_AGENT_ID" ]]; then
+    if ! check_budget "$PAPERCLIP_AGENT_ID"; then
+        exit 1
+    fi
 fi
 
 # ─── Resolve agent ───────────────────────────────────────────────
@@ -156,7 +173,7 @@ call_claude() {
 
     local payload
     payload=$(jq -n \
-        --arg model "claude-sonnet-4-6" \
+        --arg model "$CLAUDE_MODEL" \
         --arg system "$SYSTEM_PROMPT" \
         --arg content "$user_message" \
         '{
@@ -175,6 +192,9 @@ call_claude() {
         -H "anthropic-version: 2023-06-01" \
         -d "$payload")
 
+    # Save full response for token tracking
+    echo "$response" > "$OUTPUT_DIR/.last_response.json"
+
     local text
     text=$(echo "$response" | jq -r '.content[0].text // empty')
 
@@ -185,7 +205,61 @@ call_claude() {
         return 1
     fi
 
+    # Extract and accumulate token usage
+    local in_tok out_tok cost_in cost_out cost_cents
+    in_tok=$(echo "$response" | jq -r '.usage.input_tokens // 0')
+    out_tok=$(echo "$response" | jq -r '.usage.output_tokens // 0')
+    # Claude Sonnet 4: $3/1M input, $15/1M output -> in cents: 0.0003/1K in, 0.0015/1K out
+    cost_in=$(echo "scale=4; $in_tok * 0.3 / 1000" | bc)
+    cost_out=$(echo "scale=4; $out_tok * 1.5 / 1000" | bc)
+    cost_cents=$(echo "scale=0; ($cost_in + $cost_out + 0.5) / 1" | bc)
+
+    TOTAL_INPUT_TOKENS=$((TOTAL_INPUT_TOKENS + in_tok))
+    TOTAL_OUTPUT_TOKENS=$((TOTAL_OUTPUT_TOKENS + out_tok))
+    TOTAL_COST_CENTS=$((TOTAL_COST_CENTS + cost_cents))
+
+    echo "  Tokens: ${in_tok} in / ${out_tok} out (~${cost_cents}¢)" >&2
+
     echo "$text"
+}
+
+# Record cost event in Paperclip DB
+record_cost() {
+    local agent_id="$1"
+    local issue_id="$2"
+    $DB_CMD -c "INSERT INTO cost_events (company_id, agent_id, issue_id, provider, model, input_tokens, output_tokens, cost_cents, occurred_at)
+        VALUES ('$CITA_COMPANY_ID', '$agent_id', $([ -n "$issue_id" ] && echo "'$issue_id'" || echo "NULL"), 'anthropic', '$CLAUDE_MODEL', $TOTAL_INPUT_TOKENS, $TOTAL_OUTPUT_TOKENS, $TOTAL_COST_CENTS, now());" 2>/dev/null || true
+}
+
+# Check budget before running
+check_budget() {
+    local agent_id="$1"
+    local budget_cents spend_cents pct
+
+    budget_cents=$($DB_CMD -c "SELECT COALESCE(budget_monthly_cents, 0) FROM agents WHERE id='$agent_id';" 2>/dev/null || echo "0")
+    budget_cents=$(echo "$budget_cents" | tr -d ' ')
+
+    if [[ "$budget_cents" -le 0 ]]; then
+        return 0  # no budget set, skip check
+    fi
+
+    spend_cents=$($DB_CMD -c "SELECT COALESCE(SUM(cost_cents), 0) FROM cost_events WHERE agent_id='$agent_id' AND occurred_at >= date_trunc('month', now());" 2>/dev/null || echo "0")
+    spend_cents=$(echo "$spend_cents" | tr -d ' ')
+
+    pct=$((spend_cents * 100 / budget_cents))
+
+    if [[ "$spend_cents" -ge "$budget_cents" ]]; then
+        echo ""
+        echo "  BUDGET EXCEEDED: spent ${spend_cents}¢ of ${budget_cents}¢ this month"
+        echo "  Increase budget in Paperclip to continue."
+        return 1
+    fi
+
+    if [[ "$pct" -ge 80 ]]; then
+        echo "  WARNING: ${pct}% budget used (${spend_cents}¢ / ${budget_cents}¢)"
+    fi
+
+    return 0
 }
 
 # ─── Detect artifact type → target directory ────────────────────
@@ -465,17 +539,39 @@ ${VALIDATION_OUTPUT}
 
         echo ""
         echo "═══════════════════════════════════════════"
+        # Record cost in Paperclip
+        if [[ -n "$PAPERCLIP_AGENT_ID" ]]; then
+            record_cost "$PAPERCLIP_AGENT_ID" "$ISSUE_ID"
+        fi
+
+        # Budget summary
+        BUDGET_INFO=""
+        if [[ -n "$PAPERCLIP_AGENT_ID" ]]; then
+            BUDGET_CENTS=$($DB_CMD -c "SELECT COALESCE(budget_monthly_cents, 0) FROM agents WHERE id='$PAPERCLIP_AGENT_ID';" 2>/dev/null || echo "0")
+            BUDGET_CENTS=$(echo "$BUDGET_CENTS" | tr -d ' ')
+            SPEND_CENTS=$($DB_CMD -c "SELECT COALESCE(SUM(cost_cents), 0) FROM cost_events WHERE agent_id='$PAPERCLIP_AGENT_ID' AND occurred_at >= date_trunc('month', now());" 2>/dev/null || echo "0")
+            SPEND_CENTS=$(echo "$SPEND_CENTS" | tr -d ' ')
+            if [[ "$BUDGET_CENTS" -gt 0 ]]; then
+                BUDGET_PCT=$((SPEND_CENTS * 100 / BUDGET_CENTS))
+                BUDGET_INFO="  Budget: ${SPEND_CENTS}¢ / ${BUDGET_CENTS}¢ (${BUDGET_PCT}%)"
+            fi
+        fi
+
         if [[ "$PR_URL" != "FAILED" && "$PR_URL" == http* ]]; then
             echo "  PASSED - Pull Request created"
             echo "  PR: $PR_URL"
             echo "  Paperclip: CIT-$ISSUE_NUM"
+            echo "  Tokens: ${TOTAL_INPUT_TOKENS} in / ${TOTAL_OUTPUT_TOKENS} out"
+            echo "  Cost: ${TOTAL_COST_CENTS}¢"
+            [[ -n "$BUDGET_INFO" ]] && echo "$BUDGET_INFO"
             echo "  File: $TARGET_PATH"
-            echo "  Review the artifact in GitHub PR"
         else
             echo "  PASSED - Branch pushed (PR creation failed)"
             echo "  Branch: $BRANCH"
             echo "  Paperclip: CIT-$ISSUE_NUM"
-            echo "  Create PR manually: gh pr create --base main --head $BRANCH"
+            echo "  Tokens: ${TOTAL_INPUT_TOKENS} in / ${TOTAL_OUTPUT_TOKENS} out"
+            echo "  Cost: ${TOTAL_COST_CENTS}¢"
+            [[ -n "$BUDGET_INFO" ]] && echo "$BUDGET_INFO"
         fi
         echo "═══════════════════════════════════════════"
         exit 0
@@ -501,10 +597,17 @@ $RESULT"
     ATTEMPT=$((ATTEMPT + 1))
 done
 
+# Record cost even on failure
+if [[ -n "$PAPERCLIP_AGENT_ID" && "$TOTAL_COST_CENTS" -gt 0 ]]; then
+    record_cost "$PAPERCLIP_AGENT_ID" ""
+fi
+
 echo ""
 echo "═══════════════════════════════════════════"
 echo "  FAILED after $MAX_RETRIES attempts"
 echo "  Last output: $OUTPUT_FILE"
+echo "  Tokens: ${TOTAL_INPUT_TOKENS} in / ${TOTAL_OUTPUT_TOKENS} out"
+echo "  Cost: ${TOTAL_COST_CENTS}¢"
 echo "  Review manually and fix validation errors"
 echo "═══════════════════════════════════════════"
 exit 1
